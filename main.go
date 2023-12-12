@@ -20,15 +20,17 @@ const (
 )
 
 var (
-	screenWidth     = 640
-	screenHeight    = 480
-	mplusNormalFont font.Face
-	mplusBigFont    font.Face
-	photonline      []string
-	cursornowx      = int(1)
-	cursornowy      = int(1)
-	justadot        = ebiten.NewImage(10, 10)
-	returncode      = "\n"
+	screenWidth      = 640
+	screenHeight     = 480
+	mplusNormalFont  font.Face
+	mplusBigFont     font.Face
+	HackGenFont      font.Face
+	smallHackGenFont font.Face
+	photonline       []string
+	cursornowx       = int(1)
+	cursornowy       = int(1)
+	justadot         = ebiten.NewImage(10, 10)
+	returncode       = "\n"
 )
 
 //func
@@ -61,6 +63,31 @@ func init() {
 
 	// Adjust the line height.
 	mplusBigFont = text.FaceWithLineHeight(mplusBigFont, 54)
+
+	//unko
+	ttbytes, _ := os.ReadFile("/usr/share/fonts/TTF/Hack-Regular.ttf")
+
+	tt, err = opentype.Parse(ttbytes)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	HackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    24,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	smallHackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    16,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type Game struct {
@@ -74,7 +101,7 @@ func (g *Game) Update() error {
 	 * detect mouse wheel actions.
 	\*/
 	_, dy := ebiten.Wheel()
-	if dy > 0 {
+	if (dy > 0) && (cursornowy > 1) {
 		cursornowy--
 	}
 	if dy < 0 {
@@ -87,8 +114,24 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	screenWidth, screenHeight := ebiten.WindowSize()
+
+	/* init sidebar image. */
+	sidebar := ebiten.NewImage(60, screenHeight)
+	sidebar.Fill(color.RGBA{57, 57, 57, 255})
+	/* init information bar image */
+	infoBar := ebiten.NewImage(screenWidth, 20)
+	infoBar.Fill(color.RGBA{87, 97, 87, 255})
+
 	const x = 20
-	screen.Fill(color.RGBA{0x80, 0x80, 0x80, 0xff})
+	screen.Fill(color.RGBA{61, 61, 61, 255})
+
+	screen.DrawImage(sidebar, nil)
+
+	/* Processing Info-Bar Image */
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(float64(0), float64(screenHeight-20))
+	screen.DrawImage(infoBar, op)
 
 	// Draw info
 	msg := fmt.Sprintf("TPS: %0.2f", ebiten.ActualTPS())
@@ -98,7 +141,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)
 
 	// Draw Kanji text lines
-	text.Draw(screen, strconv.Itoa(cursornowy), mplusBigFont, x, 160, color.White)
+	text.Draw(screen, "Col:"+strconv.Itoa(cursornowy), smallHackGenFont, screenWidth-((len(strconv.Itoa(cursornowy))*10)+8), screenHeight-4, color.White)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -108,7 +151,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 
 func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("photon")
+	ebiten.SetWindowTitle("PhotonText(kari)")
 
 	err := os.WriteFile("./output.txt", []byte("超unko"+returncode+"unko"), 0644)
 	if err != nil {
