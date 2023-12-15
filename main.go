@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -107,14 +108,26 @@ func (g *Game) Update() error {
 	if dy < 0 {
 		cursornowy++
 	}
+	/*\
+	 * Detect touch on buttons.
+	\*/
+	mousex, mousey := ebiten.CursorPosition()
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		if mousex < 80 && mousey < 20 {
+			for !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+				time.Sleep(50 * time.Millisecond)
+			}
+			fmt.Println("unko!!!")
+			return nil
+		}
+	}
 	return nil
-
-	// detect keyboard actions.
-
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screenWidth, screenHeight := ebiten.WindowSize()
+
+	screenHeight -= 20
 
 	/* init sidebar image. */
 	sidebar := ebiten.NewImage(60, screenHeight)
@@ -122,16 +135,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	/* init information bar image */
 	infoBar := ebiten.NewImage(screenWidth, 20)
 	infoBar.Fill(color.RGBA{87, 97, 87, 255})
+	/* init top-op-bar image */
+	topopbar := ebiten.NewImage(screenWidth, 20)
+	topopbar.Fill(color.RGBA{100, 100, 100, 255})
 
 	const x = 20
 	screen.Fill(color.RGBA{61, 61, 61, 255})
 
-	screen.DrawImage(sidebar, nil)
+	sidebarop := &ebiten.DrawImageOptions{}
+	sidebarop.GeoM.Translate(float64(0), float64(20))
+	screen.DrawImage(sidebar, sidebarop)
 
 	/* Processing Info-Bar Image */
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(0), float64(screenHeight-20))
-	screen.DrawImage(infoBar, op)
+	infobarop := &ebiten.DrawImageOptions{}
+	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
+	screen.DrawImage(infoBar, infobarop)
 
 	// Draw info
 	msg := fmt.Sprintf("TPS: %0.2f", ebiten.ActualTPS())
@@ -141,7 +159,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)
 
 	// Draw Kanji text lines
-	text.Draw(screen, "Col:"+strconv.Itoa(cursornowy), smallHackGenFont, screenWidth-((len(strconv.Itoa(cursornowy))*10)+8), screenHeight-4, color.White)
+	text.Draw(screen, "Col:"+strconv.Itoa(cursornowy), smallHackGenFont, screenWidth-(((len(strconv.Itoa(cursornowy))+4)*10)+8), screenHeight+16, color.White)
+
+	//Final render --- Top operation-bar
+	screen.DrawImage(topopbar, nil)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
