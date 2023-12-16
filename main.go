@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -31,6 +30,7 @@ var (
 	cursornowx       = int(1)
 	cursornowy       = int(1)
 	justadot         = ebiten.NewImage(10, 10)
+	clickrepeated    = false
 	returncode       = "\n"
 )
 
@@ -113,13 +113,14 @@ func (g *Game) Update() error {
 	\*/
 	mousex, mousey := ebiten.CursorPosition()
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		clickrepeated = true
+	}
+	if clickrepeated && !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		if mousex < 80 && mousey < 20 {
-			for !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-				time.Sleep(50 * time.Millisecond)
-			}
 			fmt.Println("unko!!!")
-			return nil
 		}
+		clickrepeated = false
+		return nil
 	}
 	return nil
 }
