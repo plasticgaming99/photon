@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
@@ -26,17 +28,22 @@ var (
 	mplusBigFont     font.Face
 	HackGenFont      font.Face
 	smallHackGenFont font.Face
-	photonline       []string
-	cursornowx       = int(1)
-	cursornowy       = int(1)
-	justadot         = ebiten.NewImage(10, 10)
-	clickrepeated    = false
-	returncode       = "\n"
+
+	photonlines   = int(1)
+	photoncolumns = int(1)
+	photontext    = []string{}
+
+	cursornowx    = int(1)
+	cursornowy    = int(1)
+	justadot      = ebiten.NewImage(10, 10)
+	clickrepeated = false
+	returncode    = "\n"
 )
 
 //func
 
 func init() {
+	ebiten.SetVsyncEnabled(true)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
@@ -89,12 +96,20 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// after loaded text to memory, if photontext
+	// has not any strings, init photontext with
+	// 1-line, 0-column text.
+	if len(photontext) == 0 {
+		photontext = append(photontext, "unkonow")
+		photontext = append(photontext, "unko2")
+	}
 }
 
 type Game struct {
-	counter        int
+	/*counter        int
 	kanjiText      string
-	kanjiTextColor color.RGBA
+	kanjiTextColor color.RGBA*/
 }
 
 func (g *Game) Update() error {
@@ -139,8 +154,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	/* init top-op-bar image */
 	topopbar := ebiten.NewImage(screenWidth, 20)
 	topopbar.Fill(color.RGBA{100, 100, 100, 255})
+	/* init top-op-bar "files" button */
+	filesmenubutton := ebiten.NewImage(80, 20)
+	filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
+	/* init top-op-bar separator */
+	topopbarsep := ebiten.NewImage(1, 20)
+	topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 
-	const x = 20
 	screen.Fill(color.RGBA{61, 61, 61, 255})
 
 	sidebarop := &ebiten.DrawImageOptions{}
@@ -152,18 +172,39 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
 	screen.DrawImage(infoBar, infobarop)
 
-	// Draw info
-	msg := fmt.Sprintf("TPS: %0.2f", ebiten.ActualTPS())
-	text.Draw(screen, msg, mplusNormalFont, x, 40, color.White)
-
-	// Draw the sample text
-	text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)
+	// Draw the text "Photon"
+	/*text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)*/
 
 	// Draw Kanji text lines
-	text.Draw(screen, "Col:"+strconv.Itoa(cursornowy), smallHackGenFont, screenWidth-(((len(strconv.Itoa(cursornowy))+4)*10)+8), screenHeight+16, color.White)
+	text.Draw(screen, strconv.Itoa(photonlines)+":", smallHackGenFont, screenWidth-(((len(strconv.Itoa(photonlines))+1)*10)+8), screenHeight+16, color.White)
 
-	//Final render --- Top operation-bar
+	printext := 0
+	for printext < len(photontext) {
+		text.Draw(screen, photontext[printext], smallHackGenFont, 60, 20+(printext+1)*18, color.White)
+		printext++
+	}
+
+	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
+	//// Files Button
+	screen.DrawImage(filesmenubutton, nil)
+	// Label of Files Button
+	text.Draw(screen, string("Files"), smallHackGenFont, 10, 15, color.White)
+	// Draw separator of files
+	topsep1op := &ebiten.DrawImageOptions{}
+	topsep1op.GeoM.Translate(float64(80), 0)
+	screen.DrawImage(topopbarsep, topsep1op)
+
+	// Draw info
+	msg := fmt.Sprintf("TPS: %0.2f", ebiten.ActualTPS())
+	ebitenutil.DebugPrint(screen, msg)
+
+	//Benchmark
+	if len(os.Args) >= 2 {
+		if os.Args[1] == "bench" {
+			os.Exit(0)
+		}
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -175,7 +216,8 @@ func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("PhotonText(kari)")
 
-	err := os.WriteFile("./output.txt", []byte("超unko"+returncode+"unko"), 0644)
+	output := strings.Join(photontext, "\n")
+	err := os.WriteFile("./output.txt", []byte(output), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
