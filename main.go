@@ -14,6 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
@@ -40,10 +41,26 @@ var (
 	returncode    = "\n"
 )
 
+func repeatingKeyPressed(key ebiten.Key) bool {
+	const (
+		delay    = 200
+		interval = 50
+	)
+	d := inpututil.KeyPressDuration(key)
+	if d == 1 {
+		return true
+	}
+	if d >= delay && (d-delay)%interval == 0 {
+		return true
+	}
+	return false
+}
+
 //func
 
 func init() {
 	ebiten.SetVsyncEnabled(true)
+	ebiten.SetTPS(500)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
@@ -101,8 +118,7 @@ func init() {
 	// has not any strings, init photontext with
 	// 1-line, 0-column text.
 	if len(photontext) == 0 {
-		photontext = append(photontext, "unkonow")
-		photontext = append(photontext, "unko2")
+		photontext = append(photontext, "")
 	}
 }
 
@@ -110,9 +126,14 @@ type Game struct {
 	/*counter        int
 	kanjiText      string
 	kanjiTextColor color.RGBA*/
+	runeunko []rune
+	targtext string
 }
 
 func (g *Game) Update() error {
+	// Update Text-info
+	photonlines = len(photontext)
+
 	/*\
 	 * detect mouse wheel actions.
 	\*/
@@ -120,9 +141,28 @@ func (g *Game) Update() error {
 	if (dy > 0) && (cursornowy > 1) {
 		cursornowy--
 	}
-	if dy < 0 {
+	if dy < 0 && (cursornowy < photonlines) {
 		cursornowy++
 	}
+
+	//detect text input
+	g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+
+	if repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter) {
+		photontext = append(photontext, string(""))
+		cursornowy++
+	}
+	if repeatingKeyPressed(ebiten.KeyBackspace) {
+		if len(photontext[cursornowy-1]) >= 1 {
+			photontext[cursornowy-1] = photontext[cursornowy-1][:len(photontext[cursornowy-1])-1]
+		}
+	}
+
+	if !(string(g.runeunko) == "") {
+		fmt.Println(string(g.runeunko))
+		photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+	}
+
 	/*\
 	 * Detect touch on buttons.
 	\*/
@@ -216,13 +256,13 @@ func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("PhotonText(kari)")
 
-	output := strings.Join(photontext, "\n")
-	err := os.WriteFile("./output.txt", []byte(output), 0644)
-	if err != nil {
+	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := ebiten.RunGame(&Game{}); err != nil {
+	output := strings.Join(photontext, returncode)
+	err := os.WriteFile("./output.txt", []byte(output), 0644)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
