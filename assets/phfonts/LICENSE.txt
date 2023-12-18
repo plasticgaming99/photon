@@ -1,0 +1,26 @@
+mplus-1p-regular.ttf
+
+Copyright (C) 2002-2015 M+ FONTS PROJECT
+
+M+ FONT LICENSE
+These fonts are free software.
+Unlimited permission is granted to use, copy, and distribute them, with
+or without modification, either commercially or noncommercially.
+THESE FONTS ARE PROVIDED "AS IS" WITHOUT WARRANTY.
+
+-----
+NotoSansCJK-Regular.ttc, NotoSansCJK-Thin.ttc
+
+Copyright (C) 2010- Google LLC
+
+This Font Software is licensed under the SIL Open Font License,
+Version 1.1.
+
+-----
+HackGen-Regular.ttf
+
+Copyright (c) 2019, Yuko OTAWARA. with Reserved Font Name "白源", "HackGen"
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+https://scripts.sil.org/OFL

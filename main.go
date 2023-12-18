@@ -7,43 +7,41 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 
+	"github.com/hajimehoshi/ebiten/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-const (
-	sampleText = "Photon"
-)
+const ()
 
 var (
 	screenWidth      = 640
 	screenHeight     = 480
 	mplusNormalFont  font.Face
 	mplusBigFont     font.Face
+	mplusSmallFont   font.Face
 	HackGenFont      font.Face
 	smallHackGenFont font.Face
 
-	photonlines   = int(1)
-	photoncolumns = int(1)
-	photontext    = []string{}
+	photonlines = int(1)
+	photontext  = []string{}
 
 	cursornowx    = int(1)
 	cursornowy    = int(1)
-	justadot      = ebiten.NewImage(10, 10)
 	clickrepeated = false
 	returncode    = "\n"
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
 	const (
-		delay    = 200
+		delay    = 150
 		interval = 50
 	)
 	d := inpututil.KeyPressDuration(key)
@@ -59,60 +57,81 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 //func
 
 func init() {
-	ebiten.SetVsyncEnabled(true)
-	ebiten.SetTPS(500)
-	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-
-	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
-	if err != nil {
-		log.Fatal(err)
-	}
+	go ebiten.SetVsyncEnabled(true)
+	go ebiten.SetTPS(500)
+	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	const dpi = 72
-	mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    24,
-		DPI:     dpi,
-		Hinting: font.HintingVertical,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	mplusBigFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    48,
-		DPI:     dpi,
-		Hinting: font.HintingFull, // Use quantization to save glyph cache images.
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	// Adjust the line height.
-	mplusBigFont = text.FaceWithLineHeight(mplusBigFont, 54)
+	wg := &sync.WaitGroup{}
 
-	//unko
-	ttbytes, _ := os.ReadFile("/usr/share/fonts/TTF/Hack-Regular.ttf")
+	wg.Add(1)
+	go func() {
+		tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	tt, err = opentype.Parse(ttbytes)
-	if err != nil {
-		log.Fatal(err)
-	}
+		mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+			Size:    24,
+			DPI:     dpi,
+			Hinting: font.HintingVertical,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		mplusSmallFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+			Size:    16,
+			DPI:     dpi,
+			Hinting: font.HintingVertical,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		mplusBigFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+			Size:    48,
+			DPI:     dpi,
+			Hinting: font.HintingFull, // Use quantization to save glyph cache images.
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	HackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    24,
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	smallHackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    16,
-		DPI:     dpi,
-		Hinting: font.HintingFull,
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
+		// Adjust the line height.
+		mplusBigFont = text.FaceWithLineHeight(mplusBigFont, 54)
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		//unko
+		ttbytes, _ := os.ReadFile("/usr/share/fonts/TTF/Hack-Regular.ttf")
+
+		tt, err := opentype.Parse(ttbytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		HackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+			Size:    24,
+			DPI:     dpi,
+			Hinting: font.HintingFull,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		smallHackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+			Size:    16,
+			DPI:     dpi,
+			Hinting: font.HintingFull,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 
 	// after loaded text to memory, if photontext
 	// has not any strings, init photontext with
@@ -127,7 +146,6 @@ type Game struct {
 	kanjiText      string
 	kanjiTextColor color.RGBA*/
 	runeunko []rune
-	targtext string
 }
 
 func (g *Game) Update() error {
@@ -137,12 +155,27 @@ func (g *Game) Update() error {
 	/*\
 	 * detect mouse wheel actions.
 	\*/
-	_, dy := ebiten.Wheel()
+	/*_, dy := ebiten.Wheel()
 	if (dy > 0) && (cursornowy > 1) {
 		cursornowy--
-	}
+	}else
 	if dy < 0 && (cursornowy < photonlines) {
 		cursornowy++
+	}*/
+
+	/*\
+	 * detect cursor key actions
+	\*/
+	if (ebiten.IsKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+		cursornowy--
+	} else if (ebiten.IsKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
+		cursornowy++
+	} else if (ebiten.IsKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
+		cursornowx--
+	} else if (ebiten.IsKeyPressed(ebiten.KeyRight)) && (cursornowx < len([]rune(photontext[cursornowy]))) {
+		cursornowx++
+	} else if (ebiten.IsKeyPressed(ebiten.KeyControl)) && (ebiten.IsKeyPressed(ebiten.KeyC)) {
+		save()
 	}
 
 	//detect text input
@@ -151,13 +184,11 @@ func (g *Game) Update() error {
 	if repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter) {
 		photontext = append(photontext, string(""))
 		cursornowy++
-	}
-	if repeatingKeyPressed(ebiten.KeyBackspace) {
+	} else if repeatingKeyPressed(ebiten.KeyBackspace) {
 		if len(photontext[cursornowy-1]) >= 1 {
 			photontext[cursornowy-1] = photontext[cursornowy-1][:len(photontext[cursornowy-1])-1]
 		}
 	}
-
 	if !(string(g.runeunko) == "") {
 		fmt.Println(string(g.runeunko))
 		photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
@@ -191,6 +222,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	/* init information bar image */
 	infoBar := ebiten.NewImage(screenWidth, 20)
 	infoBar.Fill(color.RGBA{87, 97, 87, 255})
+	/* init cursor image */
+	cursorimg := ebiten.NewImage(10, 10)
+	cursorimg.Fill(color.RGBA{255, 255, 255, 40})
 	/* init top-op-bar image */
 	topopbar := ebiten.NewImage(screenWidth, 20)
 	topopbar.Fill(color.RGBA{100, 100, 100, 255})
@@ -220,9 +254,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	printext := 0
 	for printext < len(photontext) {
-		text.Draw(screen, photontext[printext], smallHackGenFont, 60, 20+(printext+1)*18, color.White)
+		textrepeat := 0
+		slicedtext := []rune(photontext[printext])
+		for textrepeat < len(slicedtext) {
+			text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, 60+(textrepeat+1)*10, 20+(printext+1)*18, color.White)
+			textrepeat++
+		}
 		printext++
 	}
+
+	//draw cursor
+	cursorop := &ebiten.DrawImageOptions{}
+	cursorop.GeoM.Translate(float64(60+((cursornowx)*10)), float64(10+(cursornowy)*18))
+	screen.DrawImage(cursorimg, cursorop)
 
 	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
@@ -236,7 +280,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(topopbarsep, topsep1op)
 
 	// Draw info
-	msg := fmt.Sprintf("TPS: %0.2f", ebiten.ActualTPS())
+	msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS())
 	ebitenutil.DebugPrint(screen, msg)
 
 	//Benchmark
@@ -260,6 +304,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	output := strings.Join(photontext, returncode)
+	err := os.WriteFile("./output.txt", []byte(output), 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func save() {
 	output := strings.Join(photontext, returncode)
 	err := os.WriteFile("./output.txt", []byte(output), 0644)
 	if err != nil {
