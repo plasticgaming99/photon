@@ -12,11 +12,11 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 
-	"github.com/hajimehoshi/ebiten/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/plasticgaming99/photon/assets/phfonts"
 )
 
 const ()
@@ -67,7 +67,7 @@ func init() {
 
 	wg.Add(1)
 	go func() {
-		tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
+		tt, err := opentype.Parse(phfonts.MPlus1pRegular_ttf)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -104,10 +104,7 @@ func init() {
 
 	wg.Add(1)
 	go func() {
-		//unko
-		ttbytes, _ := os.ReadFile("/usr/share/fonts/TTF/Hack-Regular.ttf")
-
-		tt, err := opentype.Parse(ttbytes)
+		tt, err := opentype.Parse(phfonts.HackGenRegular_ttf)
 		if err != nil {
 			log.Fatal(err)
 		}

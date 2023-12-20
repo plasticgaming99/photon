@@ -9,11 +9,11 @@ var (
 	MPlus1pRegular_ttf []byte
 
 	//go:embed HackGen-Regular.ttf
-	HackGenRegular_ttf
+	HackGenRegular_ttf []byte
 
 	//go:embed NotoSansCJK-Regular.ttc
-	NotoSansCJKRegular_ttc
+	NotoSansCJKRegular_ttc []byte
 
 	//go:embed NotoSansCJK-Thin.ttc
-	NotoSansCJKThin_ttc
+	NotoSansCJKThin_ttc []byte
 )
