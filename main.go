@@ -168,7 +168,7 @@ func (g *Game) Update() error {
 	/*\
 	 * detect cursor key actions
 	\*/
-	if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+	/*if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
 		cursornowy--
 	} else if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
 		cursornowy++
@@ -176,7 +176,7 @@ func (g *Game) Update() error {
 		cursornowx--
 	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx < len([]rune(photontext[cursornowy]))) {
 		cursornowx++
-	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
+	} else */if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
 		phsave()
 	}
 
@@ -187,8 +187,21 @@ func (g *Game) Update() error {
 		photontext = append(photontext, string(""))
 		cursornowy++
 	} else if repeatingKeyPressed(ebiten.KeyBackspace) {
-		if len(photontext[cursornowy-1]) >= 1 {
-			photontext[cursornowy-1] = photontext[cursornowy-1][:len(photontext[cursornowy-1])-1]
+		if (photontext[cursornowy-1] == "") && !(len(photontext) == 1) {
+			photontext[cursornowy-1] = photontext[len(photontext)-1]
+			photontext[len(photontext)-1] = os.DevNull
+			photontext = photontext[:len(photontext)-1]
+			cursornowy--
+		} else {
+			if !((cursornowy == 1) && (len(photontext[0]) == 0)) {
+				// 文字列をruneに変換
+				runes := []rune(photontext[cursornowy-1])
+				// 最後の文字を削除
+				runes = runes[:len(runes)-1]
+				// runeを文字列に変換して元のスライスに代入
+				photontext[cursornowy-1] = string(runes)
+			}
+
 		}
 	}
 	if !(string(g.runeunko) == "") {
@@ -258,8 +271,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for printext < len(photontext) {
 		textrepeat := 0
 		slicedtext := []rune(photontext[printext])
+		x := 60
+
 		for textrepeat < len(slicedtext) {
-			text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, 60+(textrepeat+1)*9, 20+(printext+1)*18, color.White)
+			if len(string(slicedtext[textrepeat])) != 1 {
+				x += 15
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+			} else {
+				x += 9
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+			}
 			textrepeat++
 		}
 		printext++
@@ -332,7 +353,8 @@ func phload(inputpath string) {
 
 func phsave() {
 	output := strings.Join(photontext, returncode)
-	err := os.WriteFile("./output.txt", []byte(output), 0644)
+	runeout := []rune(output)
+	err := os.WriteFile("./output.txt", []byte(string(runeout)), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
