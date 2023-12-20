@@ -1,5 +1,12 @@
 package main
 
+/*
+ * PhotonText very alpha by plasticgaming99
+ * (c)opyright plasticgaming99, 2023-
+ * mmm code-name like thing? oh yes
+ * photontext very alpha "anode"
+ */
+
 import (
 	"fmt"
 	"image/color"
