@@ -9,7 +9,7 @@ or without modification, either commercially or noncommercially.
 THESE FONTS ARE PROVIDED "AS IS" WITHOUT WARRANTY.
 
 -----
-NotoSansCJK-Regular.ttc, NotoSansCJK-Thin.ttc
+NotoSansCJK-Regular.ttc, NotoSansCJK-Thin.ttc, NotoSansMonoCJKjp-Regular.otf
 
 Copyright (C) 2010- Google LLC
 

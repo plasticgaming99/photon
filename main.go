@@ -130,6 +130,11 @@ func init() {
 
 	wg.Wait()
 
+	//load file
+	if len(os.Args) >= 2 {
+		phload(os.Args[1])
+	}
+
 	// after loaded text to memory, if photontext
 	// has not any strings, init photontext with
 	// 1-line, 0-column text.
@@ -163,16 +168,16 @@ func (g *Game) Update() error {
 	/*\
 	 * detect cursor key actions
 	\*/
-	if (ebiten.IsKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+	if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
 		cursornowy--
-	} else if (ebiten.IsKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
+	} else if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
 		cursornowy++
-	} else if (ebiten.IsKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
+	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
 		cursornowx--
-	} else if (ebiten.IsKeyPressed(ebiten.KeyRight)) && (cursornowx < len([]rune(photontext[cursornowy]))) {
+	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx < len([]rune(photontext[cursornowy]))) {
 		cursornowx++
-	} else if (ebiten.IsKeyPressed(ebiten.KeyControl)) && (ebiten.IsKeyPressed(ebiten.KeyC)) {
-		save()
+	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
+		phsave()
 	}
 
 	//detect text input
@@ -254,7 +259,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		textrepeat := 0
 		slicedtext := []rune(photontext[printext])
 		for textrepeat < len(slicedtext) {
-			text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, 60+(textrepeat+1)*10, 20+(printext+1)*18, color.White)
+			text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, 60+(textrepeat+1)*9, 20+(printext+1)*18, color.White)
 			textrepeat++
 		}
 		printext++
@@ -262,7 +267,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	//draw cursor
 	cursorop := &ebiten.DrawImageOptions{}
-	cursorop.GeoM.Translate(float64(60+((cursornowx)*10)), float64(10+(cursornowy)*18))
+	cursorop.GeoM.Translate(float64(60+((cursornowx)*9)), float64(10+(cursornowy)*18))
 	screen.DrawImage(cursorimg, cursorop)
 
 	//// Final render --- Top operation-bar
@@ -308,7 +313,24 @@ func main() {
 	}
 }
 
-func save() {
+func phload(inputpath string) {
+	file, err := os.ReadFile(inputpath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ftext := string(file)
+
+	// Check CRLF First, if not, Use LF.
+	if strings.Contains(ftext, "\r\n") {
+		photontext = strings.Split(ftext, "\r\n")
+		returncode = "\r\n"
+	} else {
+		photontext = strings.Split(ftext, "\n")
+		returncode = "\n"
+	}
+}
+
+func phsave() {
 	output := strings.Join(photontext, returncode)
 	err := os.WriteFile("./output.txt", []byte(output), 0644)
 	if err != nil {

@@ -16,4 +16,6 @@ var (
 
 	//go:embed NotoSansCJK-Thin.ttc
 	NotoSansCJKThin_ttc []byte
+  //go:embed NotoSansMonoCJKjp-Regular.otf
+  NotoSansMonoCJKjpRegular_otf []byte
 )
