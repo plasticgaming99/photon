@@ -26,8 +26,6 @@ import (
 	"github.com/plasticgaming99/photon/assets/phfonts"
 )
 
-const ()
-
 var (
 	screenWidth      = 640
 	screenHeight     = 480
@@ -61,8 +59,7 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 	return false
 }
 
-//func
-
+// func
 func init() {
 	go ebiten.SetVsyncEnabled(true)
 	go ebiten.SetTPS(500)
@@ -137,7 +134,7 @@ func init() {
 
 	wg.Wait()
 
-	//load file
+	// load file
 	if len(os.Args) >= 2 {
 		phload(os.Args[1])
 	}
@@ -155,6 +152,17 @@ type Game struct {
 	kanjiText      string
 	kanjiTextColor color.RGBA*/
 	runeunko []rune
+}
+
+func checkcurx(line int) {
+	if !(len([]rune(photontext[line-1])) > cursornowx) {
+		if photontext[line-1] == "" {
+			cursornowx = 1
+		} else {
+			fmt.Println([]rune(photontext[line-1]))
+			cursornowx = len([]rune(photontext[line-1]))
+		}
+	}
 }
 
 func (g *Game) Update() error {
@@ -175,26 +183,26 @@ func (g *Game) Update() error {
 	/*\
 	 * detect cursor key actions
 	\*/
-	/*if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+	if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+		checkcurx(cursornowy - 1)
 		cursornowy--
 	} else if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
+		checkcurx(cursornowy + 1)
 		cursornowy++
-	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
+	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx >= 1) {
 		cursornowx--
-	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx < len([]rune(photontext[cursornowy]))) {
+	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx <= len([]rune(photontext[cursornowy-1]))) {
 		cursornowx++
-	} else */if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
+	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
 		phsave()
 	}
-
-	//detect text input
-	g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
 
 	if repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter) {
 		photontext = append(photontext, string(""))
 		cursornowy++
+		cursornowx = 1
 	} else if repeatingKeyPressed(ebiten.KeyBackspace) {
-		if (photontext[cursornowy-1] == "") && !(len(photontext) == 1) {
+		if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 			photontext[cursornowy-1] = photontext[len(photontext)-1]
 			photontext[len(photontext)-1] = os.DevNull
 			photontext = photontext[:len(photontext)-1]
@@ -207,13 +215,20 @@ func (g *Game) Update() error {
 				runes = runes[:len(runes)-1]
 				// runeを文字列に変換して元のスライスに代入
 				photontext[cursornowy-1] = string(runes)
+				// Move to left
+				cursornowx--
 			}
-
 		}
 	}
-	if !(string(g.runeunko) == "") {
+
+	// Detect text input
+	g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+
+	// Insert text
+	if string(g.runeunko) != "" {
 		fmt.Println(string(g.runeunko))
 		photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+		cursornowx += len(g.runeunko)
 	}
 
 	/*\
@@ -272,7 +287,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	/*text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)*/
 
 	// Draw Kanji text lines
-	text.Draw(screen, strconv.Itoa(photonlines)+":", smallHackGenFont, screenWidth-(((len(strconv.Itoa(photonlines))+1)*10)+8), screenHeight+16, color.White)
+	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	printext := 0
 	for printext < len(photontext) {
@@ -283,7 +298,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		for textrepeat < len(slicedtext) {
 			if len(string(slicedtext[textrepeat])) != 1 {
 				x += 15
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-10, 20+(printext+1)*18, color.White)
 			} else {
 				x += 9
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
@@ -293,7 +308,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		printext++
 	}
 
-	//draw cursor
+	// draw cursor
 	cursorop := &ebiten.DrawImageOptions{}
 	cursorop.GeoM.Translate(float64(60+((cursornowx)*9)), float64(10+(cursornowy)*18))
 	screen.DrawImage(cursorimg, cursorop)
@@ -313,7 +328,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS())
 	ebitenutil.DebugPrint(screen, msg)
 
-	//Benchmark
+	// Benchmark
 	if len(os.Args) >= 2 {
 		if os.Args[1] == "bench" {
 			os.Exit(0)
