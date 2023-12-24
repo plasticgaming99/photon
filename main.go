@@ -155,12 +155,12 @@ type Game struct {
 }
 
 func checkcurx(line int) {
-	if !(len([]rune(photontext[line-1])) > cursornowx) {
+	if !(len([]rune(photontext[line-1])) >= cursornowx) {
 		if photontext[line-1] == "" {
 			cursornowx = 1
 		} else {
 			fmt.Println([]rune(photontext[line-1]))
-			cursornowx = len([]rune(photontext[line-1]))
+			cursornowx = len([]rune(photontext[line-1])) + 1
 		}
 	}
 }
@@ -189,7 +189,7 @@ func (g *Game) Update() error {
 	} else if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
 		checkcurx(cursornowy + 1)
 		cursornowy++
-	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx >= 1) {
+	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
 		cursornowx--
 	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx <= len([]rune(photontext[cursornowy-1]))) {
 		cursornowx++
@@ -198,8 +198,14 @@ func (g *Game) Update() error {
 	}
 
 	if repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter) {
-		photontext = append(photontext, string(""))
-		cursornowy++
+		if cursornowy == len(photontext) {
+			photontext = append(photontext, string(""))
+			cursornowy++
+		} else {
+			photontext = append(photontext[:cursornowy], append([]string{""}, photontext[cursornowy:]...)...)
+			cursornowy++
+			cursornowx = 1
+		}
 		cursornowx = 1
 	} else if repeatingKeyPressed(ebiten.KeyBackspace) {
 		if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
@@ -207,6 +213,7 @@ func (g *Game) Update() error {
 			photontext[len(photontext)-1] = os.DevNull
 			photontext = photontext[:len(photontext)-1]
 			cursornowy--
+			cursornowx = len([]rune(photontext[cursornowy-1])) + 1
 		} else {
 			if !((cursornowy == 1) && (len(photontext[0]) == 0)) {
 				// 文字列をruneに変換
@@ -260,7 +267,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	infoBar := ebiten.NewImage(screenWidth, 20)
 	infoBar.Fill(color.RGBA{87, 97, 87, 255})
 	/* init cursor image */
-	cursorimg := ebiten.NewImage(10, 10)
+	cursorimg := ebiten.NewImage(2, 15)
 	cursorimg.Fill(color.RGBA{255, 255, 255, 40})
 	/* init top-op-bar image */
 	topopbar := ebiten.NewImage(screenWidth, 20)
