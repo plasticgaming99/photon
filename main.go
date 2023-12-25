@@ -42,6 +42,10 @@ var (
 	cursornowy    = int(1)
 	clickrepeated = false
 	returncode    = "\n"
+
+	// options
+	hanzenlock     = true
+	hanzenlockstat = false
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -57,6 +61,13 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 		return true
 	}
 	return false
+}
+
+func checkMixedKanjiLength(kantext string, length int) (int, int) {
+	kantext = string([]rune(kantext)[0:length])
+	kanji := (len(kantext) - len([]rune(kantext))) / 2
+	nonkanji := len([]rune(kantext)) - kanji
+	return nonkanji - 1, kanji
 }
 
 // func
@@ -183,10 +194,13 @@ func (g *Game) Update() error {
 	/*\
 	 * detect cursor key actions
 	\*/
+	// Check upper text.
 	if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
 		checkcurx(cursornowy - 1)
 		cursornowy--
-	} else if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
+	} else
+	// Check lower text.
+	if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
 		checkcurx(cursornowy + 1)
 		cursornowy++
 	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
@@ -195,9 +209,15 @@ func (g *Game) Update() error {
 		cursornowx++
 	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
 		phsave()
+	} else if (repeatingKeyPressed(ebiten.KeyBackquote)) && (hanzenlock) {
+		if hanzenlockstat == false {
+			hanzenlockstat = true
+		} else {
+			hanzenlockstat = false
+		}
 	}
 
-	if repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter) {
+	if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
 		if cursornowy == len(photontext) {
 			photontext = append(photontext, string(""))
 			cursornowy++
@@ -207,7 +227,7 @@ func (g *Game) Update() error {
 			cursornowx = 1
 		}
 		cursornowx = 1
-	} else if repeatingKeyPressed(ebiten.KeyBackspace) {
+	} else if repeatingKeyPressed(ebiten.KeyBackspace) && !hanzenlockstat {
 		if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 			photontext[cursornowy-1] = photontext[len(photontext)-1]
 			photontext[len(photontext)-1] = os.DevNull
@@ -293,7 +313,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw the text "Photon"
 	/*text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)*/
 
-	// Draw Kanji text lines
+	// Draw left information text
+	leftinfotxt := "PhotonText alpha "
+	if hanzenlockstat == true {
+		leftinfotxt += "Hanzenlock "
+	}
+	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
+
+	// Draw right infomation text
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	printext := 0
@@ -304,11 +331,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		for textrepeat < len(slicedtext) {
 			if len(string(slicedtext[textrepeat])) != 1 {
-				x += 15
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-10, 20+(printext+1)*18, color.White)
-			} else {
-				x += 9
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+				x += 15
+			} else {
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+				x += 9
 			}
 			textrepeat++
 		}
@@ -317,7 +344,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// draw cursor
 	cursorop := &ebiten.DrawImageOptions{}
-	cursorop.GeoM.Translate(float64(60+((cursornowx)*9)), float64(10+(cursornowy)*18))
+	nonkanj, kanj := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
+	cursorproceedx := nonkanj*9 + kanj*15
+	fmt.Println(checkMixedKanjiLength(photontext[cursornowy-1], cursornowx))
+
+	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64(10+(cursornowy)*18))
 	screen.DrawImage(cursorimg, cursorop)
 
 	//// Final render --- Top operation-bar
