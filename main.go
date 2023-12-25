@@ -239,14 +239,28 @@ func (g *Game) Update() error {
 			cursornowx = len([]rune(photontext[cursornowy-1])) + 1
 		} else {
 			if !((cursornowy == 1) && (len(photontext[0]) == 0)) {
-				// 文字列をruneに変換
-				runes := []rune(photontext[cursornowy-1])
-				// 最後の文字を削除
-				runes = runes[:len(runes)-1]
-				// runeを文字列に変換して元のスライスに代入
-				photontext[cursornowy-1] = string(runes)
-				// Move to left
-				cursornowx--
+				if cursornowx == 1 {
+					fmt.Println("unko")
+				}
+				if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+					// 文字列をruneに変換
+					runes := []rune(photontext[cursornowy-1])
+					// 最後の文字を削除
+					runes = runes[:len(runes)-1]
+					// runeを文字列に変換して元のスライスに代入
+					photontext[cursornowy-1] = string(runes)
+					// Move to left
+					cursornowx--
+				} else {
+					// Convert to rune
+					runes := []rune(photontext[cursornowy-1][:cursornowx-1])
+					// Delete last
+					runes = runes[:len(runes)-1]
+					// Convert to string and insert
+					photontext[cursornowy-1] = string(runes) + string(photontext[cursornowy-1][cursornowx-1:])
+					// Move to left
+					cursornowx--
+				}
 			}
 		}
 	}
@@ -266,7 +280,7 @@ func (g *Game) Update() error {
 		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
 			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
 		} else
-		// Other
+		// Other, Insert
 		{
 			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[:len([]rune(photontext[cursornowy-1]))-(cursornowx-1)])
 		}
@@ -347,9 +361,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		for textrepeat < len(slicedtext) {
 			if len(string(slicedtext[textrepeat])) != 1 {
+				// If multi-byte text, print bigger
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, 20+(printext+1)*18, color.White)
 				x += 15
 			} else {
+				// If not, print normally
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
 				x += 9
 			}
