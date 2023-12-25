@@ -257,7 +257,20 @@ func (g *Game) Update() error {
 	// Insert text
 	if string(g.runeunko) != "" {
 		fmt.Println(string(g.runeunko))
-		photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+		// Detect left side
+		if cursornowx == 1 {
+			photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
+		} else
+		// Detect right side
+		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+		} else
+		// Other
+		{
+			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[:len([]rune(photontext[cursornowy-1]))-(cursornowx-1)])
+		}
+		// Move cursornowx. with cjk support yay!
 		cursornowx += len(g.runeunko)
 	}
 
@@ -349,7 +362,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	cursorop := &ebiten.DrawImageOptions{}
 	nonkanj, kanj := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
 	cursorproceedx := nonkanj*9 + kanj*15
-	fmt.Println(checkMixedKanjiLength(photontext[cursornowy-1], cursornowx))
 
 	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64(10+(cursornowy)*18))
 	screen.DrawImage(cursorimg, cursorop)
