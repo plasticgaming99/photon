@@ -64,10 +64,10 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 }
 
 func checkMixedKanjiLength(kantext string, length int) (int, int) {
-	kantext = string([]rune(kantext)[0:length])
+	kantext = string([]rune(kantext)[0 : length-1])
 	kanji := (len(kantext) - len([]rune(kantext))) / 2
 	nonkanji := len([]rune(kantext)) - kanji
-	return nonkanji - 1, kanji
+	return nonkanji, kanji
 }
 
 // func
@@ -75,6 +75,9 @@ func init() {
 	go ebiten.SetVsyncEnabled(true)
 	go ebiten.SetTPS(500)
 	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+
+	photontextCopy := make([]string, len(photontext))
+	copy(photontextCopy, photontext)
 
 	const dpi = 72
 
@@ -331,7 +334,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		for textrepeat < len(slicedtext) {
 			if len(string(slicedtext[textrepeat])) != 1 {
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, 20+(printext+1)*18, color.White)
 				x += 15
 			} else {
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
