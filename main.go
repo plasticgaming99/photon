@@ -50,7 +50,7 @@ var (
 
 func repeatingKeyPressed(key ebiten.Key) bool {
 	const (
-		delay    = 150
+		delay    = 200
 		interval = 50
 	)
 	d := inpututil.KeyPressDuration(key)
@@ -73,7 +73,8 @@ func checkMixedKanjiLength(kantext string, length int) (int, int) {
 // func
 func init() {
 	go ebiten.SetVsyncEnabled(true)
-	go ebiten.SetTPS(500)
+	/*100, 250, 500, 750, 1000*/
+	go ebiten.SetTPS(750)
 	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	photontextCopy := make([]string, len(photontext))
@@ -213,24 +214,29 @@ func (g *Game) Update() error {
 	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
 		phsave()
 	} else if (repeatingKeyPressed(ebiten.KeyBackquote)) && (hanzenlock) {
-		if hanzenlockstat == false {
+		if !hanzenlockstat {
 			hanzenlockstat = true
 		} else {
 			hanzenlockstat = false
 		}
+	} else if repeatingKeyPressed(ebiten.KeyHome) {
+		cursornowx = 1
+	} else if repeatingKeyPressed(ebiten.KeyEnd) {
+		cursornowx = len([]rune(photontext[cursornowy-1])) + 1
 	}
-
+	// New line
 	if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
-		if cursornowy == len(photontext) {
-			photontext = append(photontext, string(""))
-			cursornowy++
-		} else {
+		{
 			photontext = append(photontext[:cursornowy], append([]string{""}, photontext[cursornowy:]...)...)
+			photontext[cursornowy] = photontext[cursornowy-1][cursornowx-1:]
+			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1])
 			cursornowy++
 			cursornowx = 1
 		}
 		cursornowx = 1
-	} else if repeatingKeyPressed(ebiten.KeyBackspace) && !hanzenlockstat {
+	} else
+	// Line deletion.
+	if repeatingKeyPressed(ebiten.KeyBackspace) && (len(photontext[0]) != 0) && !hanzenlockstat {
 		if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 			photontext[cursornowy-1] = photontext[len(photontext)-1]
 			photontext[len(photontext)-1] = os.DevNull
@@ -238,10 +244,14 @@ func (g *Game) Update() error {
 			cursornowy--
 			cursornowx = len([]rune(photontext[cursornowy-1])) + 1
 		} else {
-			if !((cursornowy == 1) && (len(photontext[0]) == 0)) {
+			if !(cursornowx == cursornowy) || (cursornowx-1 == len([]rune(photontext[cursornowy-1]))) {
 				if cursornowx == 1 {
-					fmt.Println("unko")
-				}
+					cursornowx = len([]rune(photontext[cursornowy-2])) + 1
+					photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
+					photontext = photontext[:len(photontext)-1]
+					cursornowy--
+				} else
+				//
 				if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
 					// 文字列をruneに変換
 					runes := []rune(photontext[cursornowy-1])
@@ -253,11 +263,12 @@ func (g *Game) Update() error {
 					cursornowx--
 				} else {
 					// Convert to rune
-					runes := []rune(photontext[cursornowy-1][:cursornowx-1])
+					runes := []rune(photontext[cursornowy-1])[:cursornowx-1]
 					// Delete last
 					runes = runes[:len(runes)-1]
 					// Convert to string and insert
-					photontext[cursornowy-1] = string(runes) + string(photontext[cursornowy-1][cursornowx-1:])
+					fmt.Println(string([]rune(photontext[cursornowy-1])[cursornowx-1:]))
+					photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
 					// Move to left
 					cursornowx--
 				}
@@ -282,7 +293,7 @@ func (g *Game) Update() error {
 		} else
 		// Other, Insert
 		{
-			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[:len([]rune(photontext[cursornowy-1]))-(cursornowx-1)])
+			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
 		}
 		// Move cursornowx. with cjk support yay!
 		cursornowx += len(g.runeunko)
@@ -345,12 +356,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw left information text
 	leftinfotxt := "PhotonText alpha "
-	if hanzenlockstat == true {
+	if hanzenlockstat {
 		leftinfotxt += "Hanzenlock "
 	}
 	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
 
-	// Draw right infomation text
+	// Draw right information text
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	printext := 0
