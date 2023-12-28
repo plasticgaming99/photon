@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -38,14 +39,21 @@ var (
 	photonlines = int(1)
 	photontext  = []string{}
 
+	photoncmd = ""
+	rellines  = int(0)
+
+	textrepeatness = int(0)
+
 	cursornowx    = int(1)
 	cursornowy    = int(1)
 	clickrepeated = false
 	returncode    = "\n"
 
 	// options
-	hanzenlock     = true
-	hanzenlockstat = false
+	hanzenlock          = true
+	hanzenlockstat      = false
+	editorforcused      = true
+	commandlineforcused = false
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -187,116 +195,139 @@ func (g *Game) Update() error {
 	/*\
 	 * detect mouse wheel actions.
 	\*/
-	/*_, dy := ebiten.Wheel()
-	if (dy > 0) && (cursornowy > 1) {
-		cursornowy--
-	}else
-	if dy < 0 && (cursornowy < photonlines) {
-		cursornowy++
-	}*/
+	_, dy := ebiten.Wheel()
+	if (dy > 0) && (rellines > 0) {
+		rellines--
+	} else if (dy < 0) && (rellines < len(photontext)) {
+		rellines++
+	}
 
 	/*\
 	 * detect cursor key actions
 	\*/
-	// Check upper text.
-	if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
-		checkcurx(cursornowy - 1)
-		cursornowy--
-	} else
-	// Check lower text.
-	if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
-		checkcurx(cursornowy + 1)
-		cursornowy++
-	} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
-		cursornowx--
-	} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx <= len([]rune(photontext[cursornowy-1]))) {
-		cursornowx++
-	} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
-		phsave()
-	} else if (repeatingKeyPressed(ebiten.KeyBackquote)) && (hanzenlock) {
-		if !hanzenlockstat {
-			hanzenlockstat = true
-		} else {
-			hanzenlockstat = false
-		}
-	} else if repeatingKeyPressed(ebiten.KeyHome) {
-		cursornowx = 1
-	} else if repeatingKeyPressed(ebiten.KeyEnd) {
-		cursornowx = len([]rune(photontext[cursornowy-1])) + 1
-	}
-	// New line
-	if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
-		{
-			photontext = append(photontext[:cursornowy], append([]string{""}, photontext[cursornowy:]...)...)
-			photontext[cursornowy] = photontext[cursornowy-1][cursornowx-1:]
-			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1])
-			cursornowy++
-			cursornowx = 1
-		}
-		cursornowx = 1
-	} else
-	// Line deletion.
-	if repeatingKeyPressed(ebiten.KeyBackspace) && (len(photontext[0]) != 0) && !hanzenlockstat {
-		if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
-			photontext[cursornowy-1] = photontext[len(photontext)-1]
-			photontext[len(photontext)-1] = os.DevNull
-			photontext = photontext[:len(photontext)-1]
+	if editorforcused {
+		// Check commandline is called
+		if (ebiten.IsKeyPressed(ebiten.KeyControl)) && (ebiten.IsKeyPressed(ebiten.KeyShift)) && (ebiten.IsKeyPressed(ebiten.KeyC)) {
+			editorforcused = false
+			commandlineforcused = true
+		} else
+		// Check upper text.
+		if (repeatingKeyPressed(ebiten.KeyUp)) && (cursornowy > 1) {
+			checkcurx(cursornowy - 1)
 			cursornowy--
+		} else
+		// Check lower text.
+		if (repeatingKeyPressed(ebiten.KeyDown)) && (cursornowy < photonlines) {
+			checkcurx(cursornowy + 1)
+			cursornowy++
+		} else if (repeatingKeyPressed(ebiten.KeyLeft)) && (cursornowx > 1) {
+			cursornowx--
+		} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx <= len([]rune(photontext[cursornowy-1]))) {
+			cursornowx++
+		} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
+			fmt.Println("c pressed")
+		} else if (repeatingKeyPressed(ebiten.KeyBackquote)) && (hanzenlock) {
+			if !hanzenlockstat {
+				hanzenlockstat = true
+			} else {
+				hanzenlockstat = false
+			}
+		} else if repeatingKeyPressed(ebiten.KeyHome) {
+			cursornowx = 1
+		} else if repeatingKeyPressed(ebiten.KeyEnd) {
 			cursornowx = len([]rune(photontext[cursornowy-1])) + 1
-		} else {
-			if !(cursornowx == cursornowy) || (cursornowx-1 == len([]rune(photontext[cursornowy-1]))) {
-				if cursornowx == 1 {
-					cursornowx = len([]rune(photontext[cursornowy-2])) + 1
-					photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
-					photontext = photontext[:len(photontext)-1]
-					cursornowy--
-				} else
-				//
-				if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-					// 文字列をruneに変換
-					runes := []rune(photontext[cursornowy-1])
-					// 最後の文字を削除
-					runes = runes[:len(runes)-1]
-					// runeを文字列に変換して元のスライスに代入
-					photontext[cursornowy-1] = string(runes)
-					// Move to left
-					cursornowx--
-				} else {
-					// Convert to rune
-					runes := []rune(photontext[cursornowy-1])[:cursornowx-1]
-					// Delete last
-					runes = runes[:len(runes)-1]
-					// Convert to string and insert
-					fmt.Println(string([]rune(photontext[cursornowy-1])[cursornowx-1:]))
-					photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
-					// Move to left
-					cursornowx--
+		} else
+		// New line
+		if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
+			{
+				photontext = append(photontext[:cursornowy], append([]string{""}, photontext[cursornowy:]...)...)
+				photontext[cursornowy] = photontext[cursornowy-1][cursornowx-1:]
+				photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1])
+				cursornowy++
+				cursornowx = 1
+			}
+			cursornowx = 1
+		} else
+		// Line deletion.
+		if repeatingKeyPressed(ebiten.KeyBackspace) && (len(photontext[0]) != 0) && !hanzenlockstat {
+			if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
+				photontext[cursornowy-1] = photontext[len(photontext)-1]
+				photontext[len(photontext)-1] = os.DevNull
+				photontext = photontext[:len(photontext)-1]
+				cursornowy--
+				cursornowx = len([]rune(photontext[cursornowy-1])) + 1
+			} else {
+				if !((cursornowx == 1) && (cursornowy == 1)) || (cursornowx-1 == len([]rune(photontext[cursornowy-1]))) {
+					if cursornowx == 1 {
+						cursornowx = len([]rune(photontext[cursornowy-2])) + 1
+						photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
+						photontext = photontext[:len(photontext)-1]
+						cursornowy--
+					} else
+					//
+					if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+						// 文字列をruneに変換
+						runes := []rune(photontext[cursornowy-1])
+						// 最後の文字を削除
+						runes = runes[:len(runes)-1]
+						// runeを文字列に変換して元のスライスに代入
+						photontext[cursornowy-1] = string(runes)
+						// Move to left
+						cursornowx--
+					} else {
+						// Convert to rune
+						runes := []rune(photontext[cursornowy-1])[:cursornowx-1]
+						// Delete last
+						runes = runes[:len(runes)-1]
+						// Convert to string and insert
+						fmt.Println(string([]rune(photontext[cursornowy-1])[cursornowx-1:]))
+						photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+						// Move to left
+						cursornowx--
+					}
 				}
 			}
 		}
-	}
 
-	// Detect text input
-	g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+		// Detect text input
+		g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
 
-	// Insert text
-	if string(g.runeunko) != "" {
-		fmt.Println(string(g.runeunko))
-		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
-		// Detect left side
-		if cursornowx == 1 {
-			photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
-		} else
-		// Detect right side
-		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
-		} else
-		// Other, Insert
-		{
-			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+		// Insert text
+		if string(g.runeunko) != "" {
+			fmt.Println(string(g.runeunko))
+			/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+			// Detect left side
+			if cursornowx == 1 {
+				photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
+			} else
+			// Detect right side
+			if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+				photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+			} else
+			// Other, Insert
+			{
+				photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+			}
+			// Move cursornowx. with cjk support yay!
+			cursornowx += len(g.runeunko)
 		}
-		// Move cursornowx. with cjk support yay!
-		cursornowx += len(g.runeunko)
+	} else
+	// If command-line is forcused
+	if commandlineforcused {
+		if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+			proceedcmd(photoncmd)
+			photoncmd = ""
+			editorforcused = true
+			commandlineforcused = false
+		} else {
+			// detect text input
+			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+
+			// insert text
+			if string(g.runeunko) != "" {
+				photoncmd += string(g.runeunko)
+			}
+		}
 	}
 
 	/*\
@@ -346,11 +377,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	sidebarop.GeoM.Translate(float64(0), float64(20))
 	screen.DrawImage(sidebar, sidebarop)
 
-	/* Processing Info-Bar Image */
-	infobarop := &ebiten.DrawImageOptions{}
-	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
-	screen.DrawImage(infoBar, infobarop)
-
 	// Draw the text "Photon"
 	/*text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)*/
 
@@ -364,12 +390,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw right information text
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
+	// draw editor text
+	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18))
+	if int(Maxtext) <= len(photontext) {
+		textrepeatness = int(Maxtext) - 1
+	} else {
+		textrepeatness = len(photontext) - 1
+	}
 	printext := 0
-	for printext < len(photontext) {
+	for printext <= (textrepeatness - rellines) {
 		textrepeat := 0
-		slicedtext := []rune(photontext[printext])
+		slicedtext := []rune(photontext[printext+rellines])
 		x := 60
-
 		for textrepeat < len(slicedtext) {
 			if len(string(slicedtext[textrepeat])) != 1 {
 				// If multi-byte text, print bigger
@@ -384,6 +416,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		}
 		printext++
 	}
+	// draw comamnd-line
+	if commandlineforcused {
+		ebitenutil.DebugPrint(screen, photoncmd)
+	}
 
 	// draw cursor
 	cursorop := &ebiten.DrawImageOptions{}
@@ -392,6 +428,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64(10+(cursornowy)*18))
 	screen.DrawImage(cursorimg, cursorop)
+
+	// Draw info-bar
+	infobarop := &ebiten.DrawImageOptions{}
+	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
+	screen.DrawImage(infoBar, infobarop)
 
 	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
@@ -436,6 +477,36 @@ func main() {
 	}
 }
 
+// Proceed command
+func proceedcmd(command string) (returnstr string) {
+	command2slice := strings.Split(command, " ")
+	if len(command2slice) >= 1 {
+		// Save override
+		if command2slice[0] == "w" {
+			if len(command2slice) >= 2 {
+				return "Too many arguments for command: w ."
+			} else {
+				phsave(".")
+			}
+		} else
+		// Save with other name.
+		if command2slice[0] == "saveas" {
+			if len(command2slice) == 1 {
+				return "command: saveas Needs more arguments."
+			} else if len(command2slice) >= 3 {
+				return "Too many arguments for command: saveas ."
+			}
+		} else
+		// If not command is avaliable
+		{
+			return fmt.Sprintf("%s Is not an editor command.", command2slice[0])
+		}
+	} else {
+		return "No command was input."
+	}
+	return
+}
+
 func phload(inputpath string) {
 	file, err := os.ReadFile(inputpath)
 	if err != nil {
@@ -453,10 +524,10 @@ func phload(inputpath string) {
 	}
 }
 
-func phsave() {
+func phsave(dir string) {
 	output := strings.Join(photontext, returncode)
 	runeout := []rune(output)
-	err := os.WriteFile("./output.txt", []byte(string(runeout)), 0644)
+	err := os.WriteFile(fmt.Sprintf("%s/output.txt", dir), []byte(string(runeout)), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
