@@ -112,7 +112,7 @@ func init() {
 	go topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 
 	// Init texture options
-	sidebarop.GeoM.Translate(float64(0), float64(20))
+	go sidebarop.GeoM.Translate(float64(0), float64(20))
 
 	const dpi = 72
 
@@ -215,18 +215,23 @@ func checkcurx(line int) {
 }
 
 func (g *Game) Update() error {
+	tickwg := &sync.WaitGroup{}
 	// Update Text-info
-	photonlines = len(photontext)
+	//photonlines = len(photontext)
 
 	/*\
 	 * detect mouse wheel actions.
 	\*/
-	_, dy := ebiten.Wheel()
-	if (dy > 0) && (rellines > 0) {
-		rellines--
-	} else if (dy < 0) && (rellines < len(photontext)) {
-		rellines++
-	}
+	tickwg.Add(1)
+	go func() {
+		_, dy := ebiten.Wheel()
+		if (dy > 0) && (rellines > 0) {
+			rellines--
+		} else if (dy < 0) && (rellines < len(photontext)) {
+			rellines++
+		}
+		tickwg.Done()
+	}()
 
 	/*\
 	 * detect cursor key actions
@@ -363,17 +368,21 @@ func (g *Game) Update() error {
 	/*\
 	 * Detect touch on buttons.
 	\*/
-	mousex, mousey := ebiten.CursorPosition()
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		clickrepeated = true
-	}
-	if clickrepeated && !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		if mousex < 80 && mousey < 20 {
-			fmt.Println("unko!!!")
+	tickwg.Add(1)
+	go func() {
+		mousex, mousey := ebiten.CursorPosition()
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			clickrepeated = true
 		}
-		clickrepeated = false
-		return nil
-	}
+		if clickrepeated && !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			if mousex < 80 && mousey < 20 {
+				fmt.Println("unko!!!")
+			}
+			clickrepeated = false
+		}
+		tickwg.Done()
+	}()
+	tickwg.Wait()
 	return nil
 }
 
