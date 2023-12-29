@@ -27,6 +27,7 @@ import (
 	"github.com/plasticgaming99/photon/assets/phfonts"
 )
 
+/* basic */
 var (
 	screenWidth      = 640
 	screenHeight     = 480
@@ -54,6 +55,17 @@ var (
 	hanzenlockstat      = false
 	editorforcused      = true
 	commandlineforcused = false
+
+	// Textures
+	sidebar         = ebiten.NewImage(60, 5000)
+	infoBar         = ebiten.NewImage(5000, 20)
+	cursorimg       = ebiten.NewImage(2, 15)
+	topopbar        = ebiten.NewImage(5000, 20)
+	filesmenubutton = ebiten.NewImage(80, 20)
+	topopbarsep     = ebiten.NewImage(1, 20)
+
+	// Texture options
+	sidebarop = &ebiten.DrawImageOptions{}
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -85,8 +97,22 @@ func init() {
 	go ebiten.SetTPS(750)
 	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
-	photontextCopy := make([]string, len(photontext))
-	copy(photontextCopy, photontext)
+	// Fill textures
+	/* init sidebar image. */
+	go sidebar.Fill(color.RGBA{57, 57, 57, 255})
+	/* init information bar image */
+	go infoBar.Fill(color.RGBA{87, 97, 87, 255})
+	/* init cursor image */
+	go cursorimg.Fill(color.RGBA{255, 255, 255, 40})
+	/* init top-op-bar image */
+	go topopbar.Fill(color.RGBA{100, 100, 100, 255})
+	/* init top-op-bar "files" button */
+	go filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
+	/* init top-op-bar separator */
+	go topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
+
+	// Init texture options
+	sidebarop.GeoM.Translate(float64(0), float64(20))
 
 	const dpi = 72
 
@@ -241,7 +267,7 @@ func (g *Game) Update() error {
 		if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
 			{
 				photontext = append(photontext[:cursornowy], append([]string{""}, photontext[cursornowy:]...)...)
-				photontext[cursornowy] = photontext[cursornowy-1][cursornowx-1:]
+				photontext[cursornowy] = string([]rune(photontext[cursornowy-1])[cursornowx-1:])
 				photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1])
 				cursornowy++
 				cursornowx = 1
@@ -249,7 +275,7 @@ func (g *Game) Update() error {
 			cursornowx = 1
 		} else
 		// Line deletion.
-		if repeatingKeyPressed(ebiten.KeyBackspace) && (len(photontext[0]) != 0) && !hanzenlockstat {
+		if repeatingKeyPressed(ebiten.KeyBackspace) && !((len(photontext[0]) == 0) && (cursornowy == 1)) && !hanzenlockstat {
 			if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 				photontext[cursornowy-1] = photontext[len(photontext)-1]
 				photontext[len(photontext)-1] = os.DevNull
@@ -261,6 +287,10 @@ func (g *Game) Update() error {
 					if cursornowx == 1 {
 						cursornowx = len([]rune(photontext[cursornowy-2])) + 1
 						photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
+						if cursornowy-1 < len(photontext)-1 {
+							copy(photontext[cursornowy-1:], photontext[cursornowy:])
+						}
+						photontext[len(photontext)-1] = ""
 						photontext = photontext[:len(photontext)-1]
 						cursornowy--
 					} else
@@ -352,57 +382,30 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screenHeight -= 20
 
-	/* init sidebar image. */
-	sidebar := ebiten.NewImage(60, screenHeight)
-	sidebar.Fill(color.RGBA{57, 57, 57, 255})
-	/* init information bar image */
-	infoBar := ebiten.NewImage(screenWidth, 20)
-	infoBar.Fill(color.RGBA{87, 97, 87, 255})
-	/* init cursor image */
-	cursorimg := ebiten.NewImage(2, 15)
-	cursorimg.Fill(color.RGBA{255, 255, 255, 40})
-	/* init top-op-bar image */
-	topopbar := ebiten.NewImage(screenWidth, 20)
-	topopbar.Fill(color.RGBA{100, 100, 100, 255})
-	/* init top-op-bar "files" button */
-	filesmenubutton := ebiten.NewImage(80, 20)
-	filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
-	/* init top-op-bar separator */
-	topopbarsep := ebiten.NewImage(1, 20)
-	topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
-
 	screen.Fill(color.RGBA{61, 61, 61, 255})
 
-	sidebarop := &ebiten.DrawImageOptions{}
-	sidebarop.GeoM.Translate(float64(0), float64(20))
 	screen.DrawImage(sidebar, sidebarop)
-
-	// Draw the text "Photon"
-	/*text.Draw(screen, sampleText, mplusNormalFont, x, 80, color.White)*/
 
 	// Draw left information text
 	leftinfotxt := "PhotonText alpha "
 	if hanzenlockstat {
 		leftinfotxt += "Hanzenlock "
 	}
-	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
-
-	// Draw right information text
-	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	// draw editor text
 	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18))
-	if int(Maxtext) <= len(photontext) {
-		textrepeatness = int(Maxtext) - 1
-	} else {
+	if int(Maxtext) >= len(photontext) {
 		textrepeatness = len(photontext) - 1
+	} else {
+		textrepeatness = int(Maxtext) - 1
 	}
-	printext := 0
-	for printext <= (textrepeatness - rellines) {
-		textrepeat := 0
+
+	// start line loop
+	for printext := 0; printext <= (textrepeatness - rellines); {
 		slicedtext := []rune(photontext[printext+rellines])
 		x := 60
-		for textrepeat < len(slicedtext) {
+		//start column loop
+		for textrepeat := 0; textrepeat < len(slicedtext); {
 			if len(string(slicedtext[textrepeat])) != 1 {
 				// If multi-byte text, print bigger
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, 20+(printext+1)*18, color.White)
@@ -435,7 +438,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(infoBar, infobarop)
 
 	//// Final render --- Top operation-bar
-	screen.DrawImage(topopbar, nil)
+	topopbarop := &ebiten.DrawImageOptions{}
+	topopbarop.GeoM.Scale(float64(screenWidth), float64(1))
+	screen.DrawImage(topopbar, topopbarop)
 	//// Files Button
 	screen.DrawImage(filesmenubutton, nil)
 	// Label of Files Button
@@ -445,16 +450,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	topsep1op.GeoM.Translate(float64(80), 0)
 	screen.DrawImage(topopbarsep, topsep1op)
 
-	// Draw info
-	msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS())
-	ebitenutil.DebugPrint(screen, msg)
+	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
 
-	// Benchmark
+	// Draw right information text
+	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
+
+	// Draw info
+	go func() {
+		msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS())
+		ebitenutil.DebugPrint(screen, msg)
+	}()
+
+	/* Benchmark
 	if len(os.Args) >= 2 {
 		if os.Args[1] == "bench" {
 			os.Exit(0)
 		}
-	}
+	}*/
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -467,12 +479,6 @@ func main() {
 	ebiten.SetWindowTitle("PhotonText(kari)")
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
-		log.Fatal(err)
-	}
-
-	output := strings.Join(photontext, returncode)
-	err := os.WriteFile("./output.txt", []byte(output), 0644)
-	if err != nil {
 		log.Fatal(err)
 	}
 }
