@@ -37,8 +37,7 @@ var (
 	HackGenFont      font.Face
 	smallHackGenFont font.Face
 
-	photonlines = int(1)
-	photontext  = []string{}
+	photontext = []string{}
 
 	photoncmd = ""
 	rellines  = int(0)
@@ -57,10 +56,10 @@ var (
 	commandlineforcused = false
 
 	// Textures
-	sidebar         = ebiten.NewImage(60, 5000)
-	infoBar         = ebiten.NewImage(5000, 20)
+	sidebar         = ebiten.NewImage(60, 3000)
+	infoBar         = ebiten.NewImage(4100, 20)
 	cursorimg       = ebiten.NewImage(2, 15)
-	topopbar        = ebiten.NewImage(5000, 20)
+	topopbar        = ebiten.NewImage(4100, 20)
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
 
@@ -69,9 +68,9 @@ var (
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
-	const (
-		delay    = 200
-		interval = 50
+	var (
+		delay    = ebiten.TPS() / 4
+		interval = ebiten.TPS() / 20
 	)
 	d := inpututil.KeyPressDuration(key)
 	if d == 1 {
@@ -84,17 +83,19 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 }
 
 func checkMixedKanjiLength(kantext string, length int) (int, int) {
-	kantext = string([]rune(kantext)[0 : length-1])
+	/*kantext = string([]rune(kantext)[0 : length-1])
 	kanji := (len(kantext) - len([]rune(kantext))) / 2
-	nonkanji := len([]rune(kantext)) - kanji
-	return nonkanji, kanji
+	nonkanji := len([]rune(kantext)) - kanji*/
+	return len([]rune(string([]rune(kantext)[0:length-1]))) - (len(string([]rune(kantext)[0:length-1]))-len([]rune(string([]rune(kantext)[0:length-1]))))/2, (len(string([]rune(kantext)[0:length-1])) - len([]rune(string([]rune(kantext)[0:length-1])))) / 2
 }
 
 // func
 func init() {
 	go ebiten.SetVsyncEnabled(true)
-	/*100, 250, 500, 750, 1000*/
-	go ebiten.SetTPS(750)
+
+	/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
+	go ebiten.SetTPS(300)
+
 	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	// Fill textures
@@ -181,12 +182,14 @@ func init() {
 		wg.Done()
 	}()
 
-	wg.Wait()
-
 	// load file
-	if len(os.Args) >= 2 {
-		phload(os.Args[1])
-	}
+	go func() {
+		if len(os.Args) >= 2 {
+			phload(os.Args[1])
+		}
+	}()
+
+	wg.Wait()
 
 	// after loaded text to memory, if photontext
 	// has not any strings, init photontext with
@@ -208,7 +211,6 @@ func checkcurx(line int) {
 		if photontext[line-1] == "" {
 			cursornowx = 1
 		} else {
-			fmt.Println([]rune(photontext[line-1]))
 			cursornowx = len([]rune(photontext[line-1])) + 1
 		}
 	}
@@ -217,7 +219,7 @@ func checkcurx(line int) {
 func (g *Game) Update() error {
 	tickwg := &sync.WaitGroup{}
 	// Update Text-info
-	//photonlines = len(photontext)
+	// photonlines = len(photontext)
 
 	/*\
 	 * detect cursor key actions
@@ -303,7 +305,6 @@ func (g *Game) Update() error {
 							// Delete last
 							runes = runes[:len(runes)-1]
 							// Convert to string and insert
-							fmt.Println(string([]rune(photontext[cursornowy-1])[cursornowx-1:]))
 							photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
 							// Move to left
 							cursornowx--
@@ -317,7 +318,6 @@ func (g *Game) Update() error {
 
 			// Insert text
 			if string(g.runeunko) != "" {
-				fmt.Println(string(g.runeunko))
 				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
 				// Detect left side
 				if cursornowx == 1 {
@@ -406,7 +406,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// draw editor text
-	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18))
+	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18)) - 1
 	if int(Maxtext) >= len(photontext) {
 		textrepeatness = len(photontext) - 1
 	} else {
@@ -414,18 +414,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// start line loop
-	for printext := 0; printext <= (textrepeatness - rellines); {
+	for printext := 0; printext < len(photontext[rellines:]); {
 		slicedtext := []rune(photontext[printext+rellines])
 		x := 60
-		//start column loop
+		// start column loop
 		for textrepeat := 0; textrepeat < len(slicedtext); {
 			if len(string(slicedtext[textrepeat])) != 1 {
 				// If multi-byte text, print bigger
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, 20+(printext+1)*18, color.White)
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, ((printext + 2) * 18), color.White)
 				x += 15
 			} else {
 				// If not, print normally
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, 20+(printext+1)*18, color.White)
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, ((printext + 2) * 18), color.White)
 				x += 9
 			}
 			textrepeat++
@@ -438,11 +438,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// draw cursor
-	cursorop := &ebiten.DrawImageOptions{}
 	nonkanj, kanj := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
 	cursorproceedx := nonkanj*9 + kanj*15
 
-	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64(10+(cursornowy)*18))
+	cursorop := &ebiten.DrawImageOptions{}
+	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64((cursornowy-(rellines))*18)+5)
 	screen.DrawImage(cursorimg, cursorop)
 
 	// Draw info-bar
@@ -451,9 +451,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(infoBar, infobarop)
 
 	//// Final render --- Top operation-bar
-	topopbarop := &ebiten.DrawImageOptions{}
-	topopbarop.GeoM.Scale(float64(screenWidth), float64(1))
-	screen.DrawImage(topopbar, topopbarop)
+	screen.DrawImage(topopbar, nil)
 	//// Files Button
 	screen.DrawImage(filesmenubutton, nil)
 	// Label of Files Button
@@ -469,10 +467,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	// Draw info
-	go func() {
-		msg := fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS())
-		ebitenutil.DebugPrint(screen, msg)
-	}()
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS()))
 
 	/* Benchmark
 	if len(os.Args) >= 2 {
