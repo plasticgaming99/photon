@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -54,6 +55,7 @@ var (
 	hanzenlockstat      = false
 	editorforcused      = true
 	commandlineforcused = false
+	dbgmode             = false
 
 	// Textures
 	sidebar         = ebiten.NewImage(60, 3000)
@@ -183,10 +185,12 @@ func init() {
 	}()
 
 	// load file
+	wg.Add(1)
 	go func() {
 		if len(os.Args) >= 2 {
 			phload(os.Args[1])
 		}
+		wg.Done()
 	}()
 
 	wg.Wait()
@@ -194,9 +198,13 @@ func init() {
 	// after loaded text to memory, if photontext
 	// has not any strings, init photontext with
 	// 1-line, 0-column text.
-	if len(photontext) == 0 {
-		photontext = append(photontext, "")
-	}
+	wg.Add(1)
+	go func() {
+		if len(photontext) == 0 {
+			photontext = append(photontext, "")
+		}
+		wg.Done()
+	}()
 }
 
 type Game struct {
@@ -207,12 +215,18 @@ type Game struct {
 }
 
 func checkcurx(line int) {
-	if !(len([]rune(photontext[line-1])) >= cursornowx) {
+	if len([]rune(photontext[line-1])) < cursornowx {
 		if photontext[line-1] == "" {
 			cursornowx = 1
 		} else {
 			cursornowx = len([]rune(photontext[line-1])) + 1
 		}
+	}
+}
+
+func printdbg(text string) {
+	if dbgmode == true {
+		fmt.Println(text)
 	}
 }
 
@@ -268,7 +282,7 @@ func (g *Game) Update() error {
 					cursornowx = 1
 				}
 				cursornowx = 1
-			} else
+			}
 			// Line deletion.
 			if repeatingKeyPressed(ebiten.KeyBackspace) && !((len(photontext[0]) == 0) && (cursornowy == 1)) && !hanzenlockstat {
 				if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
@@ -317,7 +331,7 @@ func (g *Game) Update() error {
 			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
 
 			// Insert text
-			if string(g.runeunko) != "" {
+			if len(g.runeunko) > 0 {
 				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
 				// Detect left side
 				if cursornowx == 1 {
@@ -391,19 +405,30 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	screenWidth, screenHeight := ebiten.WindowSize()
+	drawwg := &sync.WaitGroup{}
 
+	screenWidth, screenHeight := ebiten.WindowSize()
 	screenHeight -= 20
 
-	screen.Fill(color.RGBA{61, 61, 61, 255})
-
-	screen.DrawImage(sidebar, sidebarop)
+	drawwg.Add(1)
+	go func() {
+		screen.Fill(color.RGBA{61, 61, 61, 255})
+		screen.DrawImage(sidebar, sidebarop)
+		drawwg.Done()
+	}()
 
 	// Draw left information text
-	leftinfotxt := "PhotonText alpha "
-	if hanzenlockstat {
-		leftinfotxt += "Hanzenlock "
-	}
+	drawwg.Add(1)
+	leftinfotxt := ""
+	go func() {
+		leftinfotxt = "PhotonText alpha "
+		if hanzenlockstat {
+			leftinfotxt += "Hanzenlock "
+		}
+		drawwg.Done()
+	}()
+
+	drawwg.Wait()
 
 	// draw editor text
 	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18)) - 1
@@ -450,6 +475,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
 	screen.DrawImage(infoBar, infobarop)
 
+	drawwg.Wait()
+
 	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
 	//// Files Button
@@ -468,7 +495,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw info
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS()))
-
 	/* Benchmark
 	if len(os.Args) >= 2 {
 		if os.Args[1] == "bench" {
@@ -485,6 +511,11 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("PhotonText(kari)")
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		fmt.Println("photontext will loaded")
+	}()
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
