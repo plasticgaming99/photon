@@ -1,10 +1,8 @@
 package main
 
 /*
- * PhotonText very alpha by plasticgaming99
+ * PhotonText very alpha (codename anode) by plasticgaming99
  * (c)opyright plasticgaming99, 2023-
- * mmm code-name like thing? oh yes
- * photontext very alpha "anode"
  */
 
 import (
@@ -26,6 +24,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/plasticgaming99/photon/assets/phfonts"
+
+	"github.com/hugolgst/rich-go/client"
 )
 
 /* basic */
@@ -51,11 +51,12 @@ var (
 	returncode    = "\n"
 
 	// options
-	hanzenlock          = true
-	hanzenlockstat      = false
+	hanzenlock     = true
+	hanzenlockstat = false
+	dbgmode        = false
+
 	editorforcused      = true
 	commandlineforcused = false
-	dbgmode             = false
 
 	// Textures
 	sidebar         = ebiten.NewImage(60, 3000)
@@ -67,6 +68,12 @@ var (
 
 	// Texture options
 	sidebarop = &ebiten.DrawImageOptions{}
+)
+
+var ( /* advanced */
+	redrawbg     = true
+	drawsidebar  = true
+	drawtopopbar = true
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -93,33 +100,41 @@ func checkMixedKanjiLength(kantext string, length int) (int, int) {
 
 // func
 func init() {
-	go ebiten.SetVsyncEnabled(true)
+	wg := &sync.WaitGroup{}
 
-	/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
-	go ebiten.SetTPS(300)
+	wg.Add(1)
+	go func() {
+		ebiten.SetVsyncEnabled(true)
 
-	go ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
+		ebiten.SetTPS(300)
 
+		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+		wg.Done()
+	}()
+
+	wg.Add(1)
 	// Fill textures
-	/* init sidebar image. */
-	go sidebar.Fill(color.RGBA{57, 57, 57, 255})
-	/* init information bar image */
-	go infoBar.Fill(color.RGBA{87, 97, 87, 255})
-	/* init cursor image */
-	go cursorimg.Fill(color.RGBA{255, 255, 255, 40})
-	/* init top-op-bar image */
-	go topopbar.Fill(color.RGBA{100, 100, 100, 255})
-	/* init top-op-bar "files" button */
-	go filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
-	/* init top-op-bar separator */
-	go topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
+	go func() {
+		/* init sidebar image. */
+		sidebar.Fill(color.RGBA{57, 57, 57, 255})
+		/* init information bar image */
+		infoBar.Fill(color.RGBA{87, 97, 87, 255})
+		/* init cursor image */
+		cursorimg.Fill(color.RGBA{255, 255, 255, 40})
+		/* init top-op-bar image */
+		topopbar.Fill(color.RGBA{100, 100, 100, 255})
+		/* init top-op-bar "files" button */
+		filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
+		/* init top-op-bar separator */
+		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 
-	// Init texture options
-	go sidebarop.GeoM.Translate(float64(0), float64(20))
+		// Init texture options
+		sidebarop.GeoM.Translate(float64(0), float64(20))
+		wg.Done()
+	}()
 
 	const dpi = 72
-
-	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
 	go func() {
@@ -225,7 +240,7 @@ func checkcurx(line int) {
 }
 
 func printdbg(text string) {
-	if dbgmode == true {
+	if dbgmode {
 		fmt.Println(text)
 	}
 }
@@ -408,14 +423,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	drawwg := &sync.WaitGroup{}
 
 	screenWidth, screenHeight := ebiten.WindowSize()
+
 	screenHeight -= 20
 
-	drawwg.Add(1)
-	go func() {
-		screen.Fill(color.RGBA{61, 61, 61, 255})
-		screen.DrawImage(sidebar, sidebarop)
-		drawwg.Done()
-	}()
+	screen.Fill(color.RGBA{61, 61, 61, 255})
+
+	screen.DrawImage(sidebar, sidebarop)
 
 	// Draw left information text
 	drawwg.Add(1)
@@ -494,7 +507,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
 	// Draw info
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS()))
+	// ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS()))
+
 	/* Benchmark
 	if len(os.Args) >= 2 {
 		if os.Args[1] == "bench" {
@@ -515,6 +529,28 @@ func main() {
 	go func() {
 		time.Sleep(5 * time.Second)
 		fmt.Println("photontext will loaded")
+	}()
+
+	go func() {
+		err := client.Login("1199337296307163146")
+		if err != nil {
+			panic(err)
+		}
+
+		now := time.Now()
+		err = client.SetActivity(client.Activity{
+			State:      "Coding",
+			Details:    "Coding with PhotonText",
+			LargeImage: "photon2",
+			LargeText:  "PhotonText Logo",
+			Timestamps: &client.Timestamps{
+				Start: &now,
+			},
+		})
+
+		if err != nil {
+			panic(err)
+		}
 	}()
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
