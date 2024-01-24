@@ -71,9 +71,7 @@ var (
 )
 
 var ( /* advanced */
-	redrawbg     = true
-	drawsidebar  = true
-	drawtopopbar = true
+	unneededwg = &sync.WaitGroup{}
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -488,8 +486,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
 	screen.DrawImage(infoBar, infobarop)
 
-	drawwg.Wait()
-
 	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
 	//// Files Button
@@ -532,14 +528,16 @@ func main() {
 	}()
 
 	go func() {
+		now := time.Now()
+
+	loop:
 		err := client.Login("1199337296307163146")
 		if err != nil {
-			panic(err)
+			time.Sleep(20 * time.Second)
+			goto loop
 		}
 
-		now := time.Now()
-		err = client.SetActivity(client.Activity{
-			State:      "Coding",
+		client.SetActivity(client.Activity{
 			Details:    "Coding with PhotonText",
 			LargeImage: "photon2",
 			LargeText:  "PhotonText Logo",
@@ -547,10 +545,6 @@ func main() {
 				Start: &now,
 			},
 		})
-
-		if err != nil {
-			panic(err)
-		}
 	}()
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
