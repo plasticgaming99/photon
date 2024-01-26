@@ -76,8 +76,8 @@ var ( /* advanced */
 
 func repeatingKeyPressed(key ebiten.Key) bool {
 	var (
-		delay    = ebiten.TPS() / 4
-		interval = ebiten.TPS() / 20
+		delay    = ebiten.TPS() / 2
+		interval = ebiten.TPS() / 18
 	)
 	d := inpututil.KeyPressDuration(key)
 	if d == 1 {
@@ -98,6 +98,8 @@ func checkMixedKanjiLength(kantext string, length int) (int, int) {
 
 // func
 func init() {
+	const dpi = 144
+
 	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
@@ -105,7 +107,7 @@ func init() {
 		ebiten.SetVsyncEnabled(true)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
-		ebiten.SetTPS(300)
+		ebiten.SetTPS(600)
 
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 		wg.Done()
@@ -132,8 +134,6 @@ func init() {
 		wg.Done()
 	}()
 
-	const dpi = 72
-
 	wg.Add(1)
 	go func() {
 		tt, err := opentype.Parse(phfonts.MPlus1pRegular_ttf)
@@ -142,7 +142,7 @@ func init() {
 		}
 
 		mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-			Size:    24,
+			Size:    12,
 			DPI:     dpi,
 			Hinting: font.HintingVertical,
 		})
@@ -150,7 +150,7 @@ func init() {
 			log.Fatal(err)
 		}
 		mplusSmallFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-			Size:    16,
+			Size:    8,
 			DPI:     dpi,
 			Hinting: font.HintingVertical,
 		})
@@ -158,7 +158,7 @@ func init() {
 			log.Fatal(err)
 		}
 		mplusBigFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-			Size:    48,
+			Size:    24,
 			DPI:     dpi,
 			Hinting: font.HintingFull, // Use quantization to save glyph cache images.
 		})
@@ -179,7 +179,7 @@ func init() {
 		}
 
 		HackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-			Size:    24,
+			Size:    12,
 			DPI:     dpi,
 			Hinting: font.HintingFull,
 		})
@@ -187,7 +187,7 @@ func init() {
 			log.Fatal(err)
 		}
 		smallHackGenFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-			Size:    16,
+			Size:    8,
 			DPI:     dpi,
 			Hinting: font.HintingFull,
 		})
@@ -251,6 +251,29 @@ func (g *Game) Update() error {
 	/*\
 	 * detect cursor key actions
 	\*/
+	tickwg.Add(1)
+	// Insert text
+	go func() {
+		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+		// Detect text input
+		g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+		// Detect left side
+		if cursornowx == 1 {
+			photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
+		} else
+		// Detect right side
+		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+		} else
+		// Other, Insert
+		{
+			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+		}
+		// Move cursornowx. with cjk support yay!
+		cursornowx += len(g.runeunko)
+		tickwg.Done()
+	}()
+
 	tickwg.Add(1)
 	go func() {
 		if editorforcused {
@@ -339,28 +362,6 @@ func (g *Game) Update() error {
 					}
 				}
 			}
-
-			// Detect text input
-			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
-
-			// Insert text
-			if len(g.runeunko) > 0 {
-				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
-				// Detect left side
-				if cursornowx == 1 {
-					photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
-				} else
-				// Detect right side
-				if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-					photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
-				} else
-				// Other, Insert
-				{
-					photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
-				}
-				// Move cursornowx. with cjk support yay!
-				cursornowx += len(g.runeunko)
-			}
 		} else
 		// If command-line is forcused
 		if commandlineforcused {
@@ -413,13 +414,35 @@ func (g *Game) Update() error {
 		}
 		tickwg.Done()
 	}()
+
+	/*\
+	 * Detect cursor's position, and changes cursor shape
+	\*/
+	tickwg.Add(1)
+	go func() {
+		curx, cury := ebiten.CursorPosition()
+		windowx, windowy := ebiten.WindowSize()
+		if ((60 < curx) && (curx < windowx)) && ((20 < cury) && (cury < windowy-20)) {
+			ebiten.SetCursorShape(ebiten.CursorShapeText)
+		} else {
+			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
+		}
+		tickwg.Done()
+	}()
+
+	tickwg.Add(1)
+	go func() {
+		if repeatingKeyPressed(ebiten.KeyA) {
+			fmt.Println("a pressed")
+		}
+		tickwg.Done()
+	}()
+
 	tickwg.Wait()
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	drawwg := &sync.WaitGroup{}
-
 	screenWidth, screenHeight := ebiten.WindowSize()
 
 	screenHeight -= 20
@@ -429,17 +452,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(sidebar, sidebarop)
 
 	// Draw left information text
-	drawwg.Add(1)
 	leftinfotxt := ""
-	go func() {
-		leftinfotxt = "PhotonText alpha "
-		if hanzenlockstat {
-			leftinfotxt += "Hanzenlock "
-		}
-		drawwg.Done()
-	}()
-
-	drawwg.Wait()
+	leftinfotxt = "PhotonText alpha "
+	if hanzenlockstat {
+		leftinfotxt += "Hanzenlock "
+	}
 
 	// draw editor text
 	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18)) - 1
@@ -451,6 +468,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// start line loop
 	for printext := 0; printext < len(photontext[rellines:]); {
+		if printext > int(Maxtext) {
+			break
+		}
 		slicedtext := []rune(photontext[printext+rellines])
 		x := 60
 		// start column loop
@@ -467,10 +487,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			textrepeat++
 		}
 		printext++
-	}
-	// draw comamnd-line
-	if commandlineforcused {
-		ebitenutil.DebugPrint(screen, photoncmd)
 	}
 
 	// draw cursor
@@ -501,6 +517,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw right information text
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
+
+	// draw comamnd-line
+	if commandlineforcused {
+		ebitenutil.DebugPrint(screen, photoncmd)
+	}
 
 	// Draw info
 	// ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f\nFPS: %0.2f", ebiten.ActualTPS(), ebiten.ActualFPS()))
@@ -537,7 +558,7 @@ func main() {
 			goto loop
 		}
 
-		client.SetActivity(client.Activity{
+		err = client.SetActivity(client.Activity{
 			Details:    "Coding with PhotonText",
 			LargeImage: "photon2",
 			LargeText:  "PhotonText Logo",
@@ -545,6 +566,10 @@ func main() {
 				Start: &now,
 			},
 		})
+
+		if err != nil {
+			fmt.Println(err)
+		}
 	}()
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
