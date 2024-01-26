@@ -89,11 +89,12 @@ func repeatingKeyPressed(key ebiten.Key) bool {
 	return false
 }
 
-func checkMixedKanjiLength(kantext string, length int) (int, int) {
-	/*kantext = string([]rune(kantext)[0 : length-1])
+func checkMixedKanjiLength(kantext string, length int) (int, int, int) {
+	kantext = string([]rune(kantext)[0 : length-1])
 	kanji := (len(kantext) - len([]rune(kantext))) / 2
-	nonkanji := len([]rune(kantext)) - kanji*/
-	return len([]rune(string([]rune(kantext)[0:length-1]))) - (len(string([]rune(kantext)[0:length-1]))-len([]rune(string([]rune(kantext)[0:length-1]))))/2, (len(string([]rune(kantext)[0:length-1])) - len([]rune(string([]rune(kantext)[0:length-1])))) / 2
+	nonkanji := len([]rune(kantext)) - kanji
+	tab := strings.Count(kantext, "	")
+	return nonkanji, kanji - tab, tab
 }
 
 // func
@@ -307,6 +308,23 @@ func (g *Game) Update() error {
 				cursornowx = 1
 			} else if repeatingKeyPressed(ebiten.KeyEnd) {
 				cursornowx = len([]rune(photontext[cursornowy-1])) + 1
+			} else if repeatingKeyPressed(ebiten.KeyTab) {
+				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+				// Detect text input
+				// Detect left side
+				if cursornowx == 1 {
+					photontext[cursornowy-1] = string("	") + photontext[cursornowy-1]
+				} else
+				// Detect right side
+				if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+					photontext[cursornowy-1] = photontext[cursornowy-1] + string("	")
+				} else
+				// Other, Insert
+				{
+					photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string("	") + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+				}
+				// Move cursornowx. with cjk support yay!
+				cursornowx += len("	")
 			} else
 			// New line
 			if (repeatingKeyPressed(ebiten.KeyEnter) || repeatingKeyPressed(ebiten.KeyNumpadEnter)) && !hanzenlockstat {
@@ -366,7 +384,7 @@ func (g *Game) Update() error {
 		// If command-line is forcused
 		if commandlineforcused {
 			if ebiten.IsKeyPressed(ebiten.KeyEnter) {
-				proceedcmd(photoncmd)
+				fmt.Println(proceedcmd(photoncmd))
 				photoncmd = ""
 				editorforcused = true
 				commandlineforcused = false
@@ -475,7 +493,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		x := 60
 		// start column loop
 		for textrepeat := 0; textrepeat < len(slicedtext); {
-			if len(string(slicedtext[textrepeat])) != 1 {
+			if string("	") == string(slicedtext[textrepeat]) {
+				x += 30
+			} else if len(string(slicedtext[textrepeat])) != 1 {
 				// If multi-byte text, print bigger
 				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, ((printext + 2) * 18), color.White)
 				x += 15
@@ -490,8 +510,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// draw cursor
-	nonkanj, kanj := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
-	cursorproceedx := nonkanj*9 + kanj*15
+	nonkanj, kanj, tabs := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
+	cursorproceedx := nonkanj*9 + kanj*15 + tabs*36
 
 	cursorop := &ebiten.DrawImageOptions{}
 	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64((cursornowy-(rellines))*18)+5)
@@ -544,20 +564,17 @@ func main() {
 	ebiten.SetWindowTitle("PhotonText(kari)")
 
 	go func() {
-		time.Sleep(5 * time.Second)
-		fmt.Println("photontext will loaded")
-	}()
-
-	go func() {
 		now := time.Now()
+		fmt.Println("photontext will booted with no error(s)")
 
-	loop:
+	loginloop:
 		err := client.Login("1199337296307163146")
 		if err != nil {
 			time.Sleep(20 * time.Second)
-			goto loop
+			goto loginloop
 		}
 
+	activityloop:
 		err = client.SetActivity(client.Activity{
 			Details:    "Coding with PhotonText",
 			LargeImage: "photon2",
@@ -566,10 +583,11 @@ func main() {
 				Start: &now,
 			},
 		})
-
 		if err != nil {
 			fmt.Println(err)
+			goto activityloop
 		}
+		fmt.Println("rich presence active")
 	}()
 
 	if err := ebiten.RunGame(&Game{}); err != nil {
@@ -586,7 +604,7 @@ func proceedcmd(command string) (returnstr string) {
 			if len(command2slice) >= 2 {
 				return "Too many arguments for command: w ."
 			} else {
-				phsave(".")
+				fmt.Println("dummy: w")
 			}
 		} else
 		// Save with other name.
@@ -595,6 +613,8 @@ func proceedcmd(command string) (returnstr string) {
 				return "command: saveas Needs more arguments."
 			} else if len(command2slice) >= 3 {
 				return "Too many arguments for command: saveas ."
+			} else /* when 2 args */ {
+				phsave(command2slice[1])
 			}
 		} else
 		// If not command is avaliable
@@ -627,7 +647,7 @@ func phload(inputpath string) {
 func phsave(dir string) {
 	output := strings.Join(photontext, returncode)
 	runeout := []rune(output)
-	err := os.WriteFile(fmt.Sprintf("%s/output.txt", dir), []byte(string(runeout)), 0644)
+	err := os.WriteFile(fmt.Sprintf("%s", dir), []byte(string(runeout)), 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
