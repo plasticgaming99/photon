@@ -678,7 +678,7 @@ func proceedcmd(command string) (returnstr string) {
 		} else
 		// If not command is avaliable
 		{
-			return fmt.Sprintf("%s Is not an editor command.", command2slice[0])
+			return fmt.Sprintf("%s wasn't found.", command2slice[0])
 		}
 	} else {
 		return "No command was input."
