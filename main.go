@@ -647,7 +647,7 @@ func proceedcmd(command string) (returnstr string) {
 			if len(command2slice) >= 2 {
 				return "Too many arguments for command: w ."
 			} else {
-				fmt.Println("dummy: w")
+				return "dummy: w"
 			}
 		} else
 		// Save with other name.
@@ -657,13 +657,25 @@ func proceedcmd(command string) (returnstr string) {
 			} else if len(command2slice) >= 3 {
 				return "Too many arguments for command: saveas ."
 			} else /* when 2 args */ {
-				phsave(command2slice[1])
+				if strings.HasPrefix(command2slice[1], "~") {
+					home, err := os.UserHomeDir()
+					if err != nil {
+						fmt.Println(err)
+					}
+					savepath := home + command2slice[1][1:]
+					phsave(savepath)
+					return fmt.Sprint("Saved to ", savepath)
+				} else {
+					phsave(command2slice[1])
+					return fmt.Sprint("Saved to ", command2slice[1])
+				}
 			}
 		} else
 		// Toggle VSync
 		if command2slice[0] == "togglevsync" {
 			ebiten.SetVsyncEnabled(!ebiten.IsVsyncEnabled())
-		}
+			return "Toggled VSync"
+		} else
 		// If not command is avaliable
 		{
 			return fmt.Sprintf("%s Is not an editor command.", command2slice[0])
@@ -671,6 +683,7 @@ func proceedcmd(command string) (returnstr string) {
 	} else {
 		return "No command was input."
 	}
+	return
 }
 
 func phload(inputpath string) {
