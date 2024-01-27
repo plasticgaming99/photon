@@ -25,6 +25,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 
 	"github.com/plasticgaming99/photon/assets/phfonts"
+	"github.com/plasticgaming99/photon/assets/phicons"
 
 	"github.com/hugolgst/rich-go/client"
 )
@@ -106,8 +107,8 @@ func init() {
 
 	wg.Add(1)
 	go func() {
-		photonicon, _, err := ebitenutil.NewImageFromFile(phicons.)
-	
+		photonicon, _, err := ebitenutil.NewImageFromFile(phicons.PhotonIcon)
+
 		ebiten.SetVsyncEnabled(true)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
