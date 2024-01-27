@@ -5,5 +5,6 @@ import (
 )
 
 var (
+	//go:embed photon2.png
 	PhotonIcon []byte
 )
