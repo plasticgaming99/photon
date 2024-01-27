@@ -20,12 +20,10 @@ import (
 	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 
 	"github.com/plasticgaming99/photon/assets/phfonts"
-	"github.com/plasticgaming99/photon/assets/phicons"
 
 	"github.com/hugolgst/rich-go/client"
 )
@@ -42,34 +40,38 @@ var (
 
 	photontext = []string{}
 
-	photoncmd = ""
-	rellines  = int(0)
+	photoncmd   = string("")
+	cmdresult   = string("")
+	clearresult = int(0)
+	rellines    = int(0)
 
 	textrepeatness = int(0)
 
 	cursornowx    = int(1)
 	cursornowy    = int(1)
 	clickrepeated = false
-	returncode    = "\n"
+	returncode    = string("\n")
 
 	// options
 	hanzenlock     = true
 	hanzenlockstat = false
 	dbgmode        = false
+	editmode       = int(1)
 
 	editorforcused      = true
 	commandlineforcused = false
 
 	// Textures
-	sidebar         = ebiten.NewImage(60, 3000)
+	sideBar         = ebiten.NewImage(60, 3000)
 	infoBar         = ebiten.NewImage(4100, 20)
+	commandLine     = ebiten.NewImage(4100, 20)
 	cursorimg       = ebiten.NewImage(2, 15)
 	topopbar        = ebiten.NewImage(4100, 20)
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
 
 	// Texture options
-	sidebarop = &ebiten.DrawImageOptions{}
+	sideBarop = &ebiten.DrawImageOptions{}
 )
 
 var ( /* advanced */
@@ -107,12 +109,9 @@ func init() {
 
 	wg.Add(1)
 	go func() {
-		photonicon, _, err := ebitenutil.NewImageFromFile(phicons.PhotonIcon)
-
-		ebiten.SetVsyncEnabled(true)
+		ebiten.SetVsyncEnabled(false)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
-		ebiten.SetTPS(600)
 
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 		wg.Done()
@@ -122,11 +121,13 @@ func init() {
 	// Fill textures
 	go func() {
 		/* init sidebar image. */
-		sidebar.Fill(color.RGBA{57, 57, 57, 255})
+		sideBar.Fill(color.RGBA{57, 57, 57, 255})
 		/* init information bar image */
 		infoBar.Fill(color.RGBA{87, 97, 87, 255})
+		/* init commandline image */
+		commandLine.Fill(color.RGBA{39, 39, 39, 255})
 		/* init cursor image */
-		cursorimg.Fill(color.RGBA{255, 255, 255, 40})
+		cursorimg.Fill(color.RGBA{255, 255, 255, 5})
 		/* init top-op-bar image */
 		topopbar.Fill(color.RGBA{100, 100, 100, 255})
 		/* init top-op-bar "files" button */
@@ -135,7 +136,7 @@ func init() {
 		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 
 		// Init texture options
-		sidebarop.GeoM.Translate(float64(0), float64(20))
+		sideBarop.GeoM.Translate(float64(0), float64(20))
 		wg.Done()
 	}()
 
@@ -252,14 +253,17 @@ func (g *Game) Update() error {
 	tickwg := &sync.WaitGroup{}
 	// Update Text-info
 	// photonlines = len(photontext)
-
 	/*\
 	 * detect cursor key actions
 	\*/
 	tickwg.Add(1)
+	fmt.Println(clearresult)
 	// Insert text
 	go func() {
 		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+		if commandlineforcused {
+			goto skiptocommandline
+		}
 		// Detect text input
 		g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
 		// Detect left side
@@ -276,6 +280,7 @@ func (g *Game) Update() error {
 		}
 		// Move cursornowx. with cjk support yay!
 		cursornowx += len(g.runeunko)
+	skiptocommandline:
 		tickwg.Done()
 	}()
 
@@ -340,12 +345,12 @@ func (g *Game) Update() error {
 					cursornowx = 1
 				}
 				cursornowx = 1
-			}
+			} else
 			// Line deletion.
 			if repeatingKeyPressed(ebiten.KeyBackspace) && !((len(photontext[0]) == 0) && (cursornowy == 1)) && !hanzenlockstat {
 				if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 					photontext[cursornowy-1] = photontext[len(photontext)-1]
-					photontext[len(photontext)-1] = os.DevNull
+					photontext[len(photontext)-1] = ""
 					photontext = photontext[:len(photontext)-1]
 					cursornowy--
 					cursornowx = len([]rune(photontext[cursornowy-1])) + 1
@@ -388,10 +393,14 @@ func (g *Game) Update() error {
 		// If command-line is forcused
 		if commandlineforcused {
 			if ebiten.IsKeyPressed(ebiten.KeyEnter) {
-				fmt.Println(proceedcmd(photoncmd))
+				cmdresult = proceedcmd(photoncmd)
+				clearresult += 10
 				photoncmd = ""
 				editorforcused = true
 				commandlineforcused = false
+			} else if (len([]rune(photoncmd)) >= 1) && (repeatingKeyPressed(ebiten.KeyBackspace)) {
+				cmdrune := []rune(photoncmd)[:len([]rune(photoncmd))-1]
+				photoncmd = string(cmdrune)
 			} else {
 				// detect text input
 				g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
@@ -469,9 +478,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	screenHeight -= 20
 
+	if commandlineforcused || cmdresult != "" {
+		screenHeight -= 20
+	}
+
 	screen.Fill(color.RGBA{61, 61, 61, 255})
 
-	screen.DrawImage(sidebar, sidebarop)
+	screen.DrawImage(sideBar, sideBarop)
 
 	// Draw left information text
 	leftinfotxt := ""
@@ -542,9 +555,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw right information text
 	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
 
-	// draw comamnd-line
-	if commandlineforcused {
-		ebitenutil.DebugPrint(screen, photoncmd)
+	// draw command-line
+	if commandlineforcused || cmdresult != "" {
+		commandlineop := &ebiten.DrawImageOptions{}
+		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+20))
+		screen.DrawImage(commandLine, commandlineop)
+		if commandlineforcused {
+			text.Draw(screen, photoncmd, smallHackGenFont, 5, screenHeight+35, color.White)
+		} else {
+			text.Draw(screen, cmdresult, smallHackGenFont, 5, screenHeight+35, color.White)
+		}
 	}
 
 	// Draw info
@@ -594,6 +614,26 @@ func main() {
 		fmt.Println("rich presence active")
 	}()
 
+	go func() {
+		for {
+			looping := false
+			if clearresult == 0 {
+				if !looping {
+					cmdresult = ""
+				}
+				time.Sleep(1 * time.Second)
+				looping = true
+			} else if clearresult <= 10 {
+				looping = false
+				time.Sleep(1 * time.Second)
+				clearresult--
+			} else if clearresult > 10 {
+				looping = false
+				clearresult = 10
+			}
+		}
+	}()
+
 	if err := ebiten.RunGame(&Game{}); err != nil {
 		log.Fatal(err)
 	}
@@ -621,6 +661,10 @@ func proceedcmd(command string) (returnstr string) {
 				phsave(command2slice[1])
 			}
 		} else
+		// Toggle VSync
+		if command2slice[0] == "togglevsync" {
+			ebiten.SetVsyncEnabled(!ebiten.IsVsyncEnabled())
+		}
 		// If not command is avaliable
 		{
 			return fmt.Sprintf("%s Is not an editor command.", command2slice[0])
@@ -628,7 +672,6 @@ func proceedcmd(command string) (returnstr string) {
 	} else {
 		return "No command was input."
 	}
-	return
 }
 
 func phload(inputpath string) {
@@ -653,7 +696,7 @@ func phsave(dir string) {
 	runeout := []rune(output)
 	err := os.WriteFile(fmt.Sprintf("%s", dir), []byte(string(runeout)), 0644)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err, "Save failed")
 	}
 }
 
