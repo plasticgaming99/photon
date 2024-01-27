@@ -257,7 +257,6 @@ func (g *Game) Update() error {
 	 * detect cursor key actions
 	\*/
 	tickwg.Add(1)
-	fmt.Println(clearresult)
 	// Insert text
 	go func() {
 		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
