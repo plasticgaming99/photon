@@ -2,7 +2,7 @@ package main
 
 /*
  * PhotonText very alpha (codename anode) by plasticgaming99
- * (c)opyright plasticgaming99, 2023-
+ * (c)opyright plasticgaming99, 2023-2024
  */
 
 import (
@@ -348,11 +348,15 @@ func (g *Game) Update() error {
 			// Line deletion.
 			if repeatingKeyPressed(ebiten.KeyBackspace) && !((len(photontext[0]) == 0) && (cursornowy == 1)) && !hanzenlockstat {
 				if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
-					photontext[cursornowy-1] = photontext[len(photontext)-1]
+					cursornowx = len([]rune(photontext[cursornowy-2])) + 1
+					photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
+					if cursornowy-1 < len(photontext)-1 {
+						copy(photontext[cursornowy-1:], photontext[cursornowy:])
+					}
 					photontext[len(photontext)-1] = ""
 					photontext = photontext[:len(photontext)-1]
 					cursornowy--
-					cursornowx = len([]rune(photontext[cursornowy-1])) + 1
+					fmt.Println("deleteline")
 				} else {
 					if !((cursornowx == 1) && (cursornowy == 1)) || (cursornowx-1 == len([]rune(photontext[cursornowy-1]))) {
 						if cursornowx == 1 {
@@ -653,9 +657,9 @@ func proceedcmd(command string) (returnstr string) {
 		// Save with other name.
 		if command2slice[0] == "saveas" {
 			if len(command2slice) == 1 {
-				return "command: saveas Needs more arguments."
+				return "Too few arguments for command: saveas"
 			} else if len(command2slice) >= 3 {
-				return "Too many arguments for command: saveas ."
+				return "Too many arguments for command: saveas"
 			} else /* when 2 args */ {
 				if strings.HasPrefix(command2slice[1], "~") {
 					home, err := os.UserHomeDir()
@@ -675,10 +679,22 @@ func proceedcmd(command string) (returnstr string) {
 		if command2slice[0] == "togglevsync" {
 			ebiten.SetVsyncEnabled(!ebiten.IsVsyncEnabled())
 			return "Toggled VSync"
+		} else if command2slice[0] == "set" {
+			if len(command2slice) == 1 {
+				return "Too few arguments for command: set"
+			} else if len(command2slice) >= 3 {
+				return "Too many arguments for command: set"
+			} else {
+				switch strings.Split(command2slice[1], "=")[0] {
+
+				default:
+					return "No internal variables named" + (strings.Split(command2slice[1], "="))[0]
+				}
+			}
 		} else
 		// If not command is avaliable
 		{
-			return fmt.Sprintf("%s Is not an editor command.", command2slice[0])
+			return fmt.Sprintf("Not an editor command: %s", command2slice[0])
 		}
 	} else {
 		return "No command was input."
@@ -686,14 +702,15 @@ func proceedcmd(command string) (returnstr string) {
 	return
 }
 
+// file load/save
 func phload(inputpath string) {
 	file, err := os.ReadFile(inputpath)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
 	}
 	ftext := string(file)
 
-	// Check CRLF First, if not, Use LF.
+	// Check CRLF(dos) First, if not, Use LF(*nix).
 	if strings.Contains(ftext, "\r\n") {
 		photontext = strings.Split(ftext, "\r\n")
 		returncode = "\r\n"
