@@ -260,31 +260,24 @@ func (g *Game) Update() error {
 	// Insert text
 	go func() {
 		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
-		if commandlineforcused {
-			goto skiptocommandline
+		if !commandlineforcused {
+			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+			// Detect left side
+			if cursornowx == 1 {
+				photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
+			} else
+			// Detect right side
+			if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
+				photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+			} else
+			// Other, Insert
+			{
+				photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+			}
+			// Move cursornowx. with cjk support yay!
+			cursornowx += len(g.runeunko)
 		}
-		// Detect text input
-		g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
-		// Detect left side
-		if cursornowx == 1 {
-			photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
-		} else
-		// Detect right side
-		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
-		} else
-		// Other, Insert
-		{
-			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
-		}
-		// Move cursornowx. with cjk support yay!
-		cursornowx += len(g.runeunko)
-	skiptocommandline:
-		tickwg.Done()
-	}()
 
-	tickwg.Add(1)
-	go func() {
 		if editorforcused {
 			// Check commandline is called
 			if (ebiten.IsKeyPressed(ebiten.KeyControl)) && (ebiten.IsKeyPressed(ebiten.KeyShift)) && (ebiten.IsKeyPressed(ebiten.KeyC)) {
@@ -349,14 +342,13 @@ func (g *Game) Update() error {
 			if repeatingKeyPressed(ebiten.KeyBackspace) && !((len(photontext[0]) == 0) && (cursornowy == 1)) && !hanzenlockstat {
 				if (photontext[cursornowy-1] == "") && (len(photontext) != 1) {
 					cursornowx = len([]rune(photontext[cursornowy-2])) + 1
-					photontext[cursornowy-2] = photontext[cursornowy-2] + photontext[cursornowy-1]
 					if cursornowy-1 < len(photontext)-1 {
 						copy(photontext[cursornowy-1:], photontext[cursornowy:])
 					}
 					photontext[len(photontext)-1] = ""
 					photontext = photontext[:len(photontext)-1]
+					cursornowx = len([]rune(photontext[cursornowy-2])) + 1
 					cursornowy--
-					fmt.Println("deleteline")
 				} else {
 					if !((cursornowx == 1) && (cursornowy == 1)) || (cursornowx-1 == len([]rune(photontext[cursornowy-1]))) {
 						if cursornowx == 1 {
@@ -377,6 +369,7 @@ func (g *Game) Update() error {
 							runes = runes[:len(runes)-1]
 							// runeを文字列に変換して元のスライスに代入
 							photontext[cursornowy-1] = string(runes)
+							time.Sleep(1 * time.Millisecond)
 							// Move to left
 							cursornowx--
 						} else {
@@ -386,6 +379,7 @@ func (g *Game) Update() error {
 							runes = runes[:len(runes)-1]
 							// Convert to string and insert
 							photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+							time.Sleep(1 * time.Millisecond)
 							// Move to left
 							cursornowx--
 						}
@@ -424,9 +418,9 @@ func (g *Game) Update() error {
 	go func() {
 		_, dy := ebiten.Wheel()
 		if (dy > 0) && (rellines > 0) {
-			rellines--
+			rellines -= 3
 		} else if (dy < 0) && (rellines < len(photontext)) {
-			rellines++
+			rellines += 3
 		}
 		tickwg.Done()
 	}()
