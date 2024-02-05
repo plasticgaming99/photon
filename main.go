@@ -24,6 +24,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 
 	"github.com/plasticgaming99/photon/assets/phfonts"
+	"github.com/plasticgaming99/photon/modules/dyntypes"
 
 	"github.com/hugolgst/rich-go/client"
 )
@@ -49,6 +50,7 @@ var (
 
 	cursornowx    = int(1)
 	cursornowy    = int(1)
+	cursorxeffort = int(0)
 	clickrepeated = false
 	returncode    = string("\n")
 
@@ -72,10 +74,6 @@ var (
 
 	// Texture options
 	sideBarop = &ebiten.DrawImageOptions{}
-)
-
-var ( /* advanced */
-	unneededwg = &sync.WaitGroup{}
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -640,8 +638,9 @@ func main() {
 func proceedcmd(command string) (returnstr string) {
 	command2slice := strings.Split(command, " ")
 	if len(command2slice) >= 1 {
+		cmd := command2slice[0]
 		// Save override
-		if command2slice[0] == "w" {
+		if cmd == "w" || cmd == "wr" || cmd == "wri" || cmd == "writ" || cmd == "write" {
 			if len(command2slice) >= 2 {
 				return "Too many arguments for command: w ."
 			} else {
@@ -679,8 +678,13 @@ func proceedcmd(command string) (returnstr string) {
 			} else if len(command2slice) >= 3 {
 				return "Too many arguments for command: set"
 			} else {
+				var2set := strings.Split(command2slice[1], "=")[1]
 				switch strings.Split(command2slice[1], "=")[0] {
-
+				case "vsync":
+					if dyntypes.IsDynTypeMatch(var2set, "bool") {
+						ebiten.SetVsyncEnabled(dyntypes.DynBool(var2set))
+					}
+					return strconv.FormatBool(ebiten.IsVsyncEnabled())
 				default:
 					return "No internal variables named" + (strings.Split(command2slice[1], "="))[0]
 				}

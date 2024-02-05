@@ -1,3 +1,5 @@
+// (c)opyright 2023- plasticgaming99
+// licensed under MIT license
 package dyntypes
 
 import (
@@ -7,6 +9,7 @@ import (
 
 // DynType has 5 types, int, str, f32, f64, bool
 // If type check occured error, It always return str.
+// float is maybe not supported but can detect
 func checkDynType(toCheck string) string {
 	var err error
 	if toCheck == "True" || toCheck == "False" {
@@ -38,7 +41,7 @@ func IsDynTypeMatch(targ1 string, targ2 string) bool {
 	return checkDynType(targ1) == targ2
 }
 
-// Return bool from dynbool. If input does
+// Returns bool from dynbool. If input does
 // not matches DynType, return false.
 func DynBool(input string) bool {
 	if checkDynType(input) == "bool" {
@@ -57,4 +60,26 @@ func DynBool(input string) bool {
 		return false
 	}
 	return false
+}
+
+// Returns string from dynstr. It always return string
+// You can use any dyntypes as string directly so this is unneeded
+// example: DynInt -> string, DynBool -> string
+func DynStr(input string) string {
+	return input
+}
+
+// Returns integer from dynint. If Dyntype
+// does not match, It always return int(0).
+func DynInt(input string) int {
+	if !(checkDynType(input) == "int") {
+		return 0
+	} else {
+		int, err := strconv.Atoi(input)
+		if err != nil {
+			return 0
+		}
+		return int
+	}
+	return 0
 }
