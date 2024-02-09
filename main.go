@@ -51,6 +51,7 @@ var (
 	cursornowx    = int(1)
 	cursornowy    = int(1)
 	cursorxeffort = int(0)
+	closewindow   = false
 	clickrepeated = false
 	returncode    = string("\n")
 
@@ -63,6 +64,8 @@ var (
 	editorforcused      = true
 	commandlineforcused = false
 
+	editingfile = string("")
+
 	// Textures
 	sideBar         = ebiten.NewImage(60, 3000)
 	infoBar         = ebiten.NewImage(4100, 20)
@@ -71,6 +74,7 @@ var (
 	topopbar        = ebiten.NewImage(4100, 20)
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
+	linessep        = ebiten.NewImage(2, 3000)
 
 	// Texture options
 	sideBarop = &ebiten.DrawImageOptions{}
@@ -132,6 +136,8 @@ func init() {
 		filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
 		/* init top-op-bar separator */
 		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
+		/* init line-bar separator */
+		linessep.Fill(color.RGBA{255, 255, 255, 255})
 
 		// Init texture options
 		sideBarop.GeoM.Translate(float64(0), float64(20))
@@ -417,7 +423,7 @@ func (g *Game) Update() error {
 		_, dy := ebiten.Wheel()
 		if (dy > 0) && (rellines > 0) {
 			rellines -= 3
-		} else if (dy < 0) && (rellines < len(photontext)) {
+		} else if (dy < 0) && (rellines+3 < len(photontext)) {
 			rellines += 3
 		}
 		tickwg.Done()
@@ -465,6 +471,9 @@ func (g *Game) Update() error {
 	}()
 
 	tickwg.Wait()
+	if closewindow {
+		return fmt.Errorf("close")
+	}
 	return nil
 }
 
@@ -497,24 +506,32 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	// start line loop
+	var (
+		textx        int
+		cursorxstart int
+	)
 	for printext := 0; printext < len(photontext[rellines:]); {
 		if printext > int(Maxtext) {
 			break
 		}
 		slicedtext := []rune(photontext[printext+rellines])
-		x := 60
+		textx = 55
+		text.Draw(screen, strconv.Itoa(printext+rellines+1), smallHackGenFont, textx+10, ((printext + 2) * 18), color.White)
+		textx = textx + (9 * len(strconv.Itoa(int(Maxtext)+rellines)))
+		textx += 20
+		cursorxstart = textx + 0
 		// start column loop
 		for textrepeat := 0; textrepeat < len(slicedtext); {
 			if string("	") == string(slicedtext[textrepeat]) {
-				x += 30
+				textx += 30
 			} else if len(string(slicedtext[textrepeat])) != 1 {
 				// If multi-byte text, print bigger
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x-1, ((printext + 2) * 18), color.White)
-				x += 15
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, textx-1, ((printext + 2) * 18), color.White)
+				textx += 15
 			} else {
 				// If not, print normally
-				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, x, ((printext + 2) * 18), color.White)
-				x += 9
+				text.Draw(screen, string(slicedtext[textrepeat]), smallHackGenFont, textx, ((printext + 2) * 18), color.White)
+				textx += 9
 			}
 			textrepeat++
 		}
@@ -523,11 +540,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// draw cursor
 	nonkanj, kanj, tabs := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
-	cursorproceedx := nonkanj*9 + kanj*15 + tabs*36
+	cursorproceedx := (nonkanj*9 + kanj*15 + tabs*36) + cursorxstart
 
 	cursorop := &ebiten.DrawImageOptions{}
-	cursorop.GeoM.Translate(float64(60+cursorproceedx), float64((cursornowy-(rellines))*18)+5)
+	cursorop.GeoM.Translate(float64(cursorproceedx), float64((cursornowy-(rellines))*18)+5)
 	screen.DrawImage(cursorimg, cursorop)
+
+	// Draw lines separator
+	linessepop := &ebiten.DrawImageOptions{}
+	linessepop.GeoM.Translate(float64(cursorxstart-5), 0)
+	screen.DrawImage(linessep, linessepop)
 
 	// Draw info-bar
 	infobarop := &ebiten.DrawImageOptions{}
@@ -542,7 +564,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	text.Draw(screen, string("Files"), smallHackGenFont, 10, 15, color.White)
 	// Draw separator of files
 	topsep1op := &ebiten.DrawImageOptions{}
-	topsep1op.GeoM.Translate(float64(80), 0)
+	topsep1op.GeoM.Translate(80, 0)
 	screen.DrawImage(topopbarsep, topsep1op)
 
 	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
@@ -593,9 +615,12 @@ func main() {
 			goto loginloop
 		}
 
+		success := bool(false)
 	activityloop:
+		state := strconv.Itoa(cursornowy) + string(":") + strconv.Itoa(cursornowx)
 		err = client.SetActivity(client.Activity{
 			Details:    "Coding with PhotonText",
+			State:      state,
 			LargeImage: "photon2",
 			LargeText:  "PhotonText Logo",
 			Timestamps: &client.Timestamps{
@@ -606,7 +631,12 @@ func main() {
 			fmt.Println(err)
 			goto activityloop
 		}
-		fmt.Println("rich presence active")
+		if !success {
+			fmt.Println("rich presence active")
+			success = true
+		}
+		time.Sleep(1 * time.Second)
+		goto activityloop
 	}()
 
 	go func() {
@@ -647,8 +677,13 @@ func proceedcmd(command string) (returnstr string) {
 				return "dummy: w"
 			}
 		} else
+		//
+		if cmd == "q" || cmd == "qu" || cmd == "qui" || cmd == "quit" {
+			ebiten.SetWindowClosingHandled(true)
+			closewindow = true
+		} else
 		// Save with other name.
-		if command2slice[0] == "saveas" {
+		if cmd == "saveas" {
 			if len(command2slice) == 1 {
 				return "Too few arguments for command: saveas"
 			} else if len(command2slice) >= 3 {
@@ -686,7 +721,7 @@ func proceedcmd(command string) (returnstr string) {
 					}
 					return strconv.FormatBool(ebiten.IsVsyncEnabled())
 				default:
-					return "No internal variables named" + (strings.Split(command2slice[1], "="))[0]
+					return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
 				}
 			}
 		} else
