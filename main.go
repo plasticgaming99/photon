@@ -11,6 +11,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +29,7 @@ import (
 	"github.com/plasticgaming99/photon/modules/dyntypes"
 
 	"github.com/hugolgst/rich-go/client"
+	"golang.design/x/clipboard"
 )
 
 /* basic */
@@ -51,9 +54,11 @@ var (
 	cursornowx    = int(1)
 	cursornowy    = int(1)
 	cursorxeffort = int(0)
+
 	closewindow   = false
 	clickrepeated = false
 	returncode    = string("\n")
+	returntype    = string("")
 
 	// options
 	hanzenlock     = true
@@ -75,6 +80,7 @@ var (
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
 	linessep        = ebiten.NewImage(2, 3000)
+	scrollbar       = ebiten.NewImage(25, 3000)
 
 	// Texture options
 	sideBarop = &ebiten.DrawImageOptions{}
@@ -114,8 +120,12 @@ func init() {
 		ebiten.SetVsyncEnabled(false)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
-
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
+
+		err := clipboard.Init()
+		if err != nil {
+			fmt.Println("**WARN** Clipboard is disabled.", err)
+		}
 		wg.Done()
 	}()
 
@@ -137,7 +147,9 @@ func init() {
 		/* init top-op-bar separator */
 		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 		/* init line-bar separator */
-		linessep.Fill(color.RGBA{255, 255, 255, 255})
+		linessep.Fill(color.RGBA{100, 100, 100, 255})
+		/* init scroll-bar */
+		scrollbar.Fill(color.RGBA{80, 80, 80, 255})
 
 		// Init texture options
 		sideBarop.GeoM.Translate(float64(0), float64(20))
@@ -230,7 +242,7 @@ func init() {
 	}()
 }
 
-type Game struct {
+type Editor struct {
 	/*counter        int
 	kanjiText      string
 	kanjiTextColor color.RGBA*/
@@ -253,7 +265,7 @@ func printdbg(text string) {
 	}
 }
 
-func (g *Game) Update() error {
+func (g *Editor) Update() error {
 	tickwg := &sync.WaitGroup{}
 	// Update Text-info
 	// photonlines = len(photontext)
@@ -264,7 +276,7 @@ func (g *Game) Update() error {
 	// Insert text
 	go func() {
 		/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
-		if !commandlineforcused {
+		if editorforcused && !(ebiten.IsKeyPressed(ebiten.KeyControl)) {
 			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
 			// Detect left side
 			if cursornowx == 1 {
@@ -301,7 +313,7 @@ func (g *Game) Update() error {
 				cursornowx--
 			} else if (repeatingKeyPressed(ebiten.KeyRight)) && (cursornowx <= len([]rune(photontext[cursornowy-1]))) {
 				cursornowx++
-			} else if (repeatingKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
+			} else if (ebiten.IsKeyPressed(ebiten.KeyControl)) && (repeatingKeyPressed(ebiten.KeyC)) {
 				fmt.Println("c pressed")
 			} else if (repeatingKeyPressed(ebiten.KeyBackquote)) && (hanzenlock) {
 				if !hanzenlockstat {
@@ -313,6 +325,7 @@ func (g *Game) Update() error {
 				cursornowx = 1
 			} else if repeatingKeyPressed(ebiten.KeyEnd) {
 				cursornowx = len([]rune(photontext[cursornowy-1])) + 1
+			} else if ebiten.IsKeyPressed(ebiten.KeyControl) && repeatingKeyPressed(ebiten.KeyV) {
 			} else if repeatingKeyPressed(ebiten.KeyTab) {
 				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
 				// Detect text input
@@ -399,7 +412,8 @@ func (g *Game) Update() error {
 				photoncmd = ""
 				editorforcused = true
 				commandlineforcused = false
-			} else if (len([]rune(photoncmd)) >= 1) && (repeatingKeyPressed(ebiten.KeyBackspace)) {
+			}
+			if (len([]rune(photoncmd)) >= 1) && (repeatingKeyPressed(ebiten.KeyBackspace)) {
 				cmdrune := []rune(photoncmd)[:len([]rune(photoncmd))-1]
 				photoncmd = string(cmdrune)
 			} else {
@@ -477,7 +491,7 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
+func (g *Editor) Draw(screen *ebiten.Image) {
 	screenWidth, screenHeight := ebiten.WindowSize()
 
 	screenHeight -= 20
@@ -497,8 +511,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		leftinfotxt += "Hanzenlock "
 	}
 
+	// Draw right information text
+	rightinfotext := " " + returntype + " " + strconv.Itoa(cursornowy) + ":" + strconv.Itoa(cursornowx)
+
 	// draw editor text
-	Maxtext := math.Ceil(((float64(screenHeight) - 20) / 18)) - 1
+	Maxtext := int(math.Ceil(((float64(screenHeight) - 20) / 18)) - 1)
 	if int(Maxtext) >= len(photontext) {
 		textrepeatness = len(photontext) - 1
 	} else {
@@ -546,6 +563,27 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	cursorop.GeoM.Translate(float64(cursorproceedx), float64((cursornowy-(rellines))*18)+5)
 	screen.DrawImage(cursorimg, cursorop)
 
+	// Draw scroll bar base
+	scrollbarop := &ebiten.DrawImageOptions{}
+	scrollbarop.GeoM.Translate(float64(screenWidth)-25, 0)
+	screen.DrawImage(scrollbar, scrollbarop)
+
+	// Draw scroll bit
+	/* init scroll-bit */
+	var textsize int
+	if len(photontext) <= Maxtext {
+		textsize = Maxtext
+	} else {
+		textsize = len(photontext)
+	}
+	scrollbartext := float64(screenHeight-20) / float64((float64(textsize) / float64(Maxtext)))
+	scrollbit := ebiten.NewImage(25, int(scrollbartext))
+	scrollbit.Fill(color.RGBA{30, 30, 30, 255})
+
+	scrollbitop := &ebiten.DrawImageOptions{}
+	scrollbitop.GeoM.Translate(float64(screenWidth)-25, float64((float64(screenHeight-20)/float64(textsize))*float64(rellines)+20))
+	screen.DrawImage(scrollbit, scrollbitop)
+
 	// Draw lines separator
 	linessepop := &ebiten.DrawImageOptions{}
 	linessepop.GeoM.Translate(float64(cursorxstart-5), 0)
@@ -569,8 +607,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
 
-	// Draw right information text
-	text.Draw(screen, strconv.Itoa(cursornowy)+":"+strconv.Itoa(cursornowx), smallHackGenFont, screenWidth-((((len(strconv.Itoa(cursornowx))+len(strconv.Itoa(cursornowy)))+1)*10)+8), screenHeight+16, color.White)
+	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+16, color.White)
 
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
@@ -595,7 +632,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}*/
 }
 
-func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
+func (g *Editor) Layout(outsideWidth, outsideHeight int) (int, int) {
 	screenWidth, screenHeight := ebiten.WindowSize()
 	return screenWidth, screenHeight
 }
@@ -659,7 +696,7 @@ func main() {
 		}
 	}()
 
-	if err := ebiten.RunGame(&Game{}); err != nil {
+	if err := ebiten.RunGame(&Editor{}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -672,22 +709,28 @@ func proceedcmd(command string) (returnstr string) {
 		// Save override
 		if cmd == "w" || cmd == "wr" || cmd == "wri" || cmd == "writ" || cmd == "write" {
 			if len(command2slice) >= 2 {
-				return "Too many arguments for command: w ."
+				return "Too many arguments for command: " + cmd
 			} else {
-				return "dummy: w"
+				phsave(editingfile)
+				return fmt.Sprint("Saved to ", editingfile)
 			}
 		} else
 		//
 		if cmd == "q" || cmd == "qu" || cmd == "qui" || cmd == "quit" {
 			ebiten.SetWindowClosingHandled(true)
 			closewindow = true
+		} else if cmd == "wq" {
+			proceedcmd("w")
+			proceedcmd("q")
+		} else if cmd == "version" {
+			return "PhotonText rolling " + runtime.Version()
 		} else
 		// Save with other name.
-		if cmd == "saveas" {
+		if cmd == "sav" || cmd == "save" || cmd == "savea" || cmd == "saveas" {
 			if len(command2slice) == 1 {
-				return "Too few arguments for command: saveas"
+				return "Too few arguments for command: " + cmd
 			} else if len(command2slice) >= 3 {
-				return "Too many arguments for command: saveas"
+				return "Too many arguments for command: " + cmd
 			} else /* when 2 args */ {
 				if strings.HasPrefix(command2slice[1], "~") {
 					home, err := os.UserHomeDir()
@@ -709,9 +752,9 @@ func proceedcmd(command string) (returnstr string) {
 			return "Toggled VSync"
 		} else if command2slice[0] == "set" {
 			if len(command2slice) == 1 {
-				return "Too few arguments for command: set"
+				return "Too few arguments for command: " + cmd
 			} else if len(command2slice) >= 3 {
-				return "Too many arguments for command: set"
+				return "Too many arguments for command: " + cmd
 			} else {
 				var2set := strings.Split(command2slice[1], "=")[1]
 				switch strings.Split(command2slice[1], "=")[0] {
@@ -720,6 +763,10 @@ func proceedcmd(command string) (returnstr string) {
 						ebiten.SetVsyncEnabled(dyntypes.DynBool(var2set))
 					}
 					return strconv.FormatBool(ebiten.IsVsyncEnabled())
+				case "rellines":
+					if dyntypes.IsDynTypeMatch(var2set, "int") {
+						rellines = dyntypes.DynInt(var2set)
+					}
 				default:
 					return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
 				}
@@ -738,6 +785,11 @@ func proceedcmd(command string) (returnstr string) {
 // file load/save
 func phload(inputpath string) {
 	file, err := os.ReadFile(inputpath)
+	editingfile, err = filepath.Abs(inputpath)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(editingfile)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -747,9 +799,11 @@ func phload(inputpath string) {
 	if strings.Contains(ftext, "\r\n") {
 		photontext = strings.Split(ftext, "\r\n")
 		returncode = "\r\n"
+		returntype = "CRLF"
 	} else {
 		photontext = strings.Split(ftext, "\n")
 		returncode = "\n"
+		returntype = "LF"
 	}
 }
 

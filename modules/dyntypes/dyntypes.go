@@ -1,3 +1,5 @@
+// Dyntypes proceeds dynamic-typing on Go.
+
 // (c)opyright 2023- plasticgaming99
 // licensed under MIT license
 package dyntypes
@@ -10,12 +12,15 @@ import (
 // DynType has 5 types, int, str, f32, f64, bool
 // If type check occured error, It always return str.
 // float is maybe not supported but can detect
-func checkDynType(toCheck string) string {
+func CheckDynType(toCheck string) string {
 	var err error
-	if toCheck == "True" || toCheck == "False" {
+	if toCheck == "True" || toCheck == "true" || toCheck == "False" || toCheck == "false" {
 		return "bool"
 	} else {
-		if strings.Contains(toCheck, ".") {
+		_, err = strconv.Atoi(toCheck)
+		if err == nil {
+			return "int"
+		} else if strings.Contains(toCheck, ".") {
 			_, err = strconv.ParseFloat(toCheck, 64)
 			if err != nil {
 				_, err = strconv.ParseFloat(toCheck, 32)
@@ -27,10 +32,6 @@ func checkDynType(toCheck string) string {
 			} else {
 				return "f64"
 			}
-		}
-		_, err = strconv.Atoi(toCheck)
-		if err != nil {
-			return "int"
 		} else {
 			return "str"
 		}
@@ -38,19 +39,19 @@ func checkDynType(toCheck string) string {
 }
 
 func IsDynTypeMatch(targ1 string, targ2 string) bool {
-	return checkDynType(targ1) == targ2
+	return CheckDynType(targ1) == targ2
 }
 
 // Returns bool from dynbool. If input does
 // not matches DynType, return false.
 func DynBool(input string) bool {
-	if checkDynType(input) == "bool" {
+	if CheckDynType(input) == "bool" {
 		if input == "False" {
 			return false
 		} else if input == "True" {
 			return true
 		}
-	} else if checkDynType(input) == "int" {
+	} else if CheckDynType(input) == "int" {
 		if input == "1" {
 			return true
 		} else if input == "0" {
@@ -72,7 +73,7 @@ func DynStr(input string) string {
 // Returns integer from dynint. If Dyntype
 // does not match, It always return int(0).
 func DynInt(input string) int {
-	if !(checkDynType(input) == "int") {
+	if !(CheckDynType(input) == "int") {
 		return 0
 	} else {
 		int, err := strconv.Atoi(input)
