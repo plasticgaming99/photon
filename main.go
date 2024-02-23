@@ -73,10 +73,10 @@ var (
 
 	// Textures
 	sideBar         = ebiten.NewImage(60, 3000)
-	infoBar         = ebiten.NewImage(4100, 20)
-	commandLine     = ebiten.NewImage(4100, 20)
+	infoBar         *ebiten.Image
+	commandLine     *ebiten.Image
 	cursorimg       = ebiten.NewImage(2, 15)
-	topopbar        = ebiten.NewImage(4100, 20)
+	topopbar        *ebiten.Image
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
 	linessep        = ebiten.NewImage(2, 3000)
@@ -84,6 +84,13 @@ var (
 
 	// Texture options
 	sideBarop = &ebiten.DrawImageOptions{}
+)
+
+/* Texture options */
+var (
+	topopBarSize    = 20
+	infoBarSize     = 20
+	commandlineSize = 20
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -126,33 +133,6 @@ func init() {
 		if err != nil {
 			fmt.Println("**WARN** Clipboard is disabled.", err)
 		}
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	// Fill textures
-	go func() {
-		/* init sidebar image. */
-		sideBar.Fill(color.RGBA{57, 57, 57, 255})
-		/* init information bar image */
-		infoBar.Fill(color.RGBA{87, 97, 87, 255})
-		/* init commandline image */
-		commandLine.Fill(color.RGBA{39, 39, 39, 255})
-		/* init cursor image */
-		cursorimg.Fill(color.RGBA{255, 255, 255, 5})
-		/* init top-op-bar image */
-		topopbar.Fill(color.RGBA{100, 100, 100, 255})
-		/* init top-op-bar "files" button */
-		filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
-		/* init top-op-bar separator */
-		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
-		/* init line-bar separator */
-		linessep.Fill(color.RGBA{100, 100, 100, 255})
-		/* init scroll-bar */
-		scrollbar.Fill(color.RGBA{80, 80, 80, 255})
-
-		// Init texture options
-		sideBarop.GeoM.Translate(float64(0), float64(20))
 		wg.Done()
 	}()
 
@@ -240,6 +220,78 @@ func init() {
 		}
 		wg.Done()
 	}()
+
+	// Execute PhotonRC when its avaliable
+	wg.Add(1)
+	go func() {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Println(err)
+		}
+		phrcpath := home + "/.photonrc"
+
+		if err != nil {
+			panic(err)
+		}
+		_, err = os.Stat(phrcpath)
+		if err == nil {
+			fmt.Println("Using PhotonRC")
+			photonRC, err := sliceload(phrcpath)
+			if err != nil {
+				fmt.Println("PhotonRC initializing failed. Using default")
+			}
+			for i := 0; i < len(photonRC); i++ {
+				proceedcmd(photonRC[i])
+			}
+			photonRC = nil
+		}
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		// After executed PhotonRC, Initialize textures
+		sideBar = ebiten.NewImage(60, 3000)
+		infoBar = ebiten.NewImage(4100, infoBarSize)
+		commandLine = ebiten.NewImage(4100, commandlineSize)
+		cursorimg = ebiten.NewImage(2, 15)
+		topopbar = ebiten.NewImage(4100, topopBarSize)
+		filesmenubutton = ebiten.NewImage(80, 20)
+		topopbarsep = ebiten.NewImage(1, 20)
+		linessep = ebiten.NewImage(2, 3000)
+		scrollbar = ebiten.NewImage(25, 3000)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	wg.Add(1)
+	// Fill textures
+	go func() {
+		/* init sidebar image. */
+		sideBar.Fill(color.RGBA{57, 57, 57, 255})
+		/* init information bar image */
+		infoBar.Fill(color.RGBA{87, 97, 87, 255})
+		/* init commandline image */
+		commandLine.Fill(color.RGBA{39, 39, 39, 255})
+		/* init cursor image */
+		cursorimg.Fill(color.RGBA{255, 255, 255, 5})
+		/* init top-op-bar image */
+		topopbar.Fill(color.RGBA{100, 100, 100, 255})
+		/* init top-op-bar "files" button */
+		filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
+		/* init top-op-bar separator */
+		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
+		/* init line-bar separator */
+		linessep.Fill(color.RGBA{100, 100, 100, 255})
+		/* init scroll-bar */
+		scrollbar.Fill(color.RGBA{80, 80, 80, 255})
+
+		// Init texture options
+		sideBarop.GeoM.Translate(float64(0), float64(20))
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 type Editor struct {
@@ -256,12 +308,6 @@ func checkcurx(line int) {
 		} else {
 			cursornowx = len([]rune(photontext[line-1])) + 1
 		}
-	}
-}
-
-func printdbg(text string) {
-	if dbgmode {
-		fmt.Println(text)
 	}
 }
 
@@ -494,7 +540,7 @@ func (g *Editor) Update() error {
 func (g *Editor) Draw(screen *ebiten.Image) {
 	screenWidth, screenHeight := ebiten.WindowSize()
 
-	screenHeight -= 20
+	screenHeight -= topopBarSize
 
 	if commandlineforcused || cmdresult != "" {
 		screenHeight -= 20
@@ -572,7 +618,7 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	/* init scroll-bit */
 	var textsize int
 	if len(photontext) <= Maxtext {
-		textsize = Maxtext
+		textsize = len(photontext) + Maxtext
 	} else {
 		textsize = len(photontext)
 	}
@@ -590,9 +636,9 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	screen.DrawImage(linessep, linessepop)
 
 	// Draw info-bar
-	infobarop := &ebiten.DrawImageOptions{}
-	infobarop.GeoM.Translate(float64(0), float64(screenHeight))
-	screen.DrawImage(infoBar, infobarop)
+	infoBarop := &ebiten.DrawImageOptions{}
+	infoBarop.GeoM.Translate(0, float64(screenHeight))
+	screen.DrawImage(infoBar, infoBarop)
 
 	//// Final render --- Top operation-bar
 	screen.DrawImage(topopbar, nil)
@@ -605,19 +651,19 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	topsep1op.GeoM.Translate(80, 0)
 	screen.DrawImage(topopbarsep, topsep1op)
 
-	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+16, color.White)
+	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+infoBarSize-4, color.White)
 
-	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+16, color.White)
+	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+infoBarSize-4, color.White)
 
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
 		commandlineop := &ebiten.DrawImageOptions{}
-		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+20))
+		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+commandlineSize))
 		screen.DrawImage(commandLine, commandlineop)
 		if commandlineforcused {
-			text.Draw(screen, photoncmd, smallHackGenFont, 5, screenHeight+35, color.White)
+			text.Draw(screen, photoncmd, smallHackGenFont, 5, screenHeight+15+commandlineSize, color.White)
 		} else {
-			text.Draw(screen, cmdresult, smallHackGenFont, 5, screenHeight+35, color.White)
+			text.Draw(screen, cmdresult, smallHackGenFont, 5, screenHeight+15+commandlineSize, color.White)
 		}
 	}
 
@@ -696,6 +742,17 @@ func main() {
 		}
 	}()
 
+	go func() {
+		for {
+			if editingfile == "" {
+				ebiten.SetWindowTitle("PhotonText(kari)")
+			} else {
+				ebiten.SetWindowTitle(fmt.Sprint(editingfile, " - PhotonText(kari)"))
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+
 	if err := ebiten.RunGame(&Editor{}); err != nil {
 		log.Fatal(err)
 	}
@@ -757,18 +814,32 @@ func proceedcmd(command string) (returnstr string) {
 				return "Too many arguments for command: " + cmd
 			} else {
 				var2set := strings.Split(command2slice[1], "=")[1]
-				switch strings.Split(command2slice[1], "=")[0] {
-				case "vsync":
-					if dyntypes.IsDynTypeMatch(var2set, "bool") {
-						ebiten.SetVsyncEnabled(dyntypes.DynBool(var2set))
+				if 1 < len(var2set) {
+					switch strings.Split(command2slice[1], "=")[0] {
+					case "vsync":
+						if dyntypes.IsDynTypeMatch(var2set, "bool") {
+							ebiten.SetVsyncEnabled(dyntypes.DynBool(var2set))
+						}
+						return strconv.FormatBool(ebiten.IsVsyncEnabled())
+					case "rellines":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							rellines = dyntypes.DynInt(var2set)
+						}
+					case "topopbarsize":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							topopBarSize = dyntypes.DynInt(var2set)
+						}
+					case "infobarsize":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							infoBarSize = dyntypes.DynInt(var2set)
+						}
+					case "commandlinesize":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							commandlineSize = dyntypes.DynInt(var2set)
+						}
+					default:
+						return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
 					}
-					return strconv.FormatBool(ebiten.IsVsyncEnabled())
-				case "rellines":
-					if dyntypes.IsDynTypeMatch(var2set, "int") {
-						rellines = dyntypes.DynInt(var2set)
-					}
-				default:
-					return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
 				}
 			}
 		} else
@@ -789,10 +860,6 @@ func phload(inputpath string) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(editingfile)
-	if err != nil {
-		fmt.Println(err)
-	}
 	ftext := string(file)
 
 	// Check CRLF(dos) First, if not, Use LF(*nix).
@@ -807,10 +874,32 @@ func phload(inputpath string) {
 	}
 }
 
+func sliceload(inputpath string) ([]string, error) {
+	var slice2load []string
+	var sliceerr error
+	file, err := os.ReadFile(inputpath)
+	if err != nil {
+		sliceerr = err
+	}
+	ftext := string(file)
+
+	// Check CRLF(dos) First, if not, Use LF(*nix).
+	if strings.Contains(ftext, "\r\n") {
+		slice2load = strings.Split(ftext, "\r\n")
+		returncode = "\r\n"
+		returntype = "CRLF"
+	} else {
+		slice2load = strings.Split(ftext, "\n")
+		returncode = "\n"
+		returntype = "LF"
+	}
+	return slice2load, sliceerr
+}
+
 func phsave(dir string) {
 	output := strings.Join(photontext, returncode)
 	runeout := []rune(output)
-	err := os.WriteFile(fmt.Sprintf("%s", dir), []byte(string(runeout)), 0644)
+	err := os.WriteFile(dir, []byte(string(runeout)), 0644)
 	if err != nil {
 		fmt.Println(err, "Save failed")
 	}
