@@ -64,6 +64,7 @@ var (
 	hanzenlock      = true
 	hanzenlockstat  = false
 	limitterenabled = true
+	limitterlevel   = int(5)
 	dbgmode         = false
 	editmode        = int(1)
 
@@ -82,6 +83,7 @@ var (
 	topopbarsep     = ebiten.NewImage(1, 20)
 	linessep        = ebiten.NewImage(2, 3000)
 	scrollbar       = ebiten.NewImage(25, 3000)
+	scrollbit       *ebiten.Image
 
 	// Texture options
 	sideBarop = &ebiten.DrawImageOptions{}
@@ -92,6 +94,7 @@ var (
 	topopBarSize    = 20
 	infoBarSize     = 20
 	commandlineSize = 20
+	scrollbarwidth  = 18
 )
 
 func repeatingKeyPressed(key ebiten.Key) bool {
@@ -115,6 +118,18 @@ func checkMixedKanjiLength(kantext string, length int) (int, int, int) {
 	nonkanji := len([]rune(kantext)) - kanji
 	tab := strings.Count(kantext, "	")
 	return nonkanji, kanji - tab, tab
+}
+
+// renew image. if same size, return same image
+func renewimg(image *ebiten.Image, targetwidth int, targetheight int, targetcolor color.Color) *ebiten.Image {
+	widthnow := image.Bounds().Dx()
+	heightnow := image.Bounds().Dy()
+	if widthnow != targetwidth || heightnow != targetheight {
+		newimage := ebiten.NewImage(targetwidth, targetheight)
+		newimage.Fill(targetcolor)
+		return newimage
+	}
+	return image
 }
 
 // func
@@ -222,10 +237,10 @@ func init() {
 		}
 		wg.Done()
 	}()
+	wg.Wait()
 
 	// Execute PhotonRC when its avaliable
-	wg.Add(1)
-	go func() {
+	{
 		home, err := os.UserHomeDir()
 		if err != nil {
 			fmt.Println(err)
@@ -247,11 +262,9 @@ func init() {
 			}
 			photonRC = nil
 		}
-		wg.Done()
-	}()
+	}
 
-	wg.Add(1)
-	go func() {
+	{
 		// After executed PhotonRC, Initialize textures
 		sideBar = ebiten.NewImage(60, 3000)
 		infoBar = ebiten.NewImage(4100, infoBarSize)
@@ -261,14 +274,12 @@ func init() {
 		filesmenubutton = ebiten.NewImage(80, 20)
 		topopbarsep = ebiten.NewImage(1, 20)
 		linessep = ebiten.NewImage(2, 3000)
-		scrollbar = ebiten.NewImage(25, 3000)
-		wg.Done()
-	}()
-	wg.Wait()
+		scrollbar = ebiten.NewImage(scrollbarwidth, 100)
+		scrollbit = ebiten.NewImage(scrollbarwidth, 100)
+	}
 
-	wg.Add(1)
 	// Fill textures
-	go func() {
+	{
 		/* init sidebar image. */
 		sideBar.Fill(color.RGBA{57, 57, 57, 255})
 		/* init information bar image */
@@ -287,13 +298,12 @@ func init() {
 		linessep.Fill(color.RGBA{100, 100, 100, 255})
 		/* init scroll-bar */
 		scrollbar.Fill(color.RGBA{80, 80, 80, 255})
+		/* init scroll-bit */
+		scrollbit.Fill(color.RGBA{30, 30, 30, 255})
 
 		// Init texture options
 		sideBarop.GeoM.Translate(float64(0), float64(20))
-		wg.Done()
-	}()
-
-	wg.Wait()
+	}
 }
 
 type Editor struct {
@@ -571,12 +581,20 @@ var (
 	prevcurx = int(0)
 	prevcury = int(0)
 	prevrell = int(0)
+	phburst  = int(0)
 )
 
 func (g *Editor) Draw(screen *ebiten.Image) {
 
-	if (prevcurx == cursornowx || prevcury == cursornowy || prevrell == rellines) && limitterenabled {
-		time.Sleep(5 * time.Millisecond)
+	if (prevcurx == cursornowx && prevcury == cursornowy && prevrell == rellines) && limitterenabled {
+		time.Sleep(time.Duration(phburst) * time.Millisecond)
+		if phburst < limitterlevel {
+			phburst += 1
+		}
+	} else {
+		if 0 <= phburst {
+			phburst = 0
+		}
 	}
 
 	prevcurx, prevcury, prevrell = cursornowx, cursornowy, rellines
@@ -589,8 +607,10 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 		screenHeight -= 20
 	}
 
+	// Init screen
 	screen.Fill(color.RGBA{61, 61, 61, 255})
 
+	sideBar = renewimg(sideBar, 60, screenWidth, color.RGBA{57, 57, 57, 255})
 	screen.DrawImage(sideBar, sideBarop)
 
 	// Draw left information text
@@ -653,8 +673,9 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	screen.DrawImage(cursorimg, cursorop)
 
 	// Draw scroll bar base
+	scrollbar = renewimg(scrollbar, scrollbarwidth, screenHeight, color.RGBA{80, 80, 80, 255})
 	scrollbarop := &ebiten.DrawImageOptions{}
-	scrollbarop.GeoM.Translate(float64(screenWidth)-25, 0)
+	scrollbarop.GeoM.Translate(float64(screenWidth)-float64(scrollbarwidth), float64(topopBarSize))
 	screen.DrawImage(scrollbar, scrollbarop)
 
 	// Draw scroll bit
@@ -666,11 +687,10 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 		textsize = len(photontext)
 	}
 	scrollbartext := float64(screenHeight-20) / float64((float64(textsize) / float64(Maxtext)))
-	scrollbit := ebiten.NewImage(25, int(scrollbartext))
-	scrollbit.Fill(color.RGBA{30, 30, 30, 255})
+	scrollbit = renewimg(scrollbit, scrollbarwidth, int(scrollbartext), color.RGBA{30, 30, 30, 255}) //ebiten.NewImage(25, int(scrollbartext))
 
 	scrollbitop := &ebiten.DrawImageOptions{}
-	scrollbitop.GeoM.Translate(float64(screenWidth)-25, float64((float64(screenHeight-20)/float64(textsize))*float64(rellines)+20))
+	scrollbitop.GeoM.Translate(float64(screenWidth)-float64(scrollbarwidth), float64((float64(screenHeight-20)/float64(textsize))*float64(rellines)+20))
 	screen.DrawImage(scrollbit, scrollbitop)
 
 	// Draw lines separator
@@ -700,6 +720,7 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
+		scrollbar = renewimg(scrollbar, screenWidth, commandlineSize, color.RGBA{80, 80, 80, 255})
 		commandlineop := &ebiten.DrawImageOptions{}
 		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+commandlineSize))
 		screen.DrawImage(commandLine, commandlineop)
@@ -883,6 +904,10 @@ func proceedcmd(command string) (returnstr string) {
 					case "limitter":
 						if dyntypes.IsDynTypeMatch(var2set, "bool") {
 							limitterenabled = dyntypes.DynBool(var2set)
+						}
+					case "limitterlevel":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							limitterlevel = dyntypes.DynInt(var2set)
 						}
 					default:
 						return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
