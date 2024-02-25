@@ -61,10 +61,11 @@ var (
 	returntype    = string("")
 
 	// options
-	hanzenlock     = true
-	hanzenlockstat = false
-	dbgmode        = false
-	editmode       = int(1)
+	hanzenlock      = true
+	hanzenlockstat  = false
+	limitterenabled = true
+	dbgmode         = false
+	editmode        = int(1)
 
 	editorforcused      = true
 	commandlineforcused = false
@@ -125,6 +126,7 @@ func init() {
 	wg.Add(1)
 	go func() {
 		ebiten.SetVsyncEnabled(false)
+		ebiten.SetScreenClearedEveryFrame(false)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
@@ -372,6 +374,34 @@ func (g *Editor) Update() error {
 			} else if repeatingKeyPressed(ebiten.KeyEnd) {
 				cursornowx = len([]rune(photontext[cursornowy-1])) + 1
 			} else if ebiten.IsKeyPressed(ebiten.KeyControl) && repeatingKeyPressed(ebiten.KeyV) {
+				testslice := strings.Split(string(clipboard.Read(clipboard.FmtText)), "\n")
+				firsttext := string([]rune(photontext[cursornowy-1])[:cursornowx-1])
+				lasttext := string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+				//{photontext[cursornowy-1] = string(g.runeunko)}
+
+				fmt.Println(testslice)
+				if len(testslice) == 1 {
+					photontext[cursornowy-1] = firsttext + testslice[0] + lasttext
+					cursornowx = len([]rune(firsttext + testslice[0]))
+					fmt.Println("one")
+				} else {
+					for i := 0; i < len(testslice); i++ {
+						if i == 0 {
+							photontext[cursornowy-1] = firsttext + testslice[i]
+						} else {
+							{
+								photontext = append(photontext[:cursornowy], append([]string{testslice[i]}, photontext[cursornowy:]...)...)
+								/*photontext[cursornowy] = string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+								photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1])*/
+								cursornowy++
+							}
+							if i == len(testslice)-1 {
+								cursornowx = len([]rune(testslice[i])) + 1
+							}
+						}
+						fmt.Println(i)
+					}
+				}
 			} else if repeatingKeyPressed(ebiten.KeyTab) {
 				/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
 				// Detect text input
@@ -537,7 +567,20 @@ func (g *Editor) Update() error {
 	return nil
 }
 
+var (
+	prevcurx = int(0)
+	prevcury = int(0)
+	prevrell = int(0)
+)
+
 func (g *Editor) Draw(screen *ebiten.Image) {
+
+	if (prevcurx == cursornowx || prevcury == cursornowy || prevrell == rellines) && limitterenabled {
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	prevcurx, prevcury, prevrell = cursornowx, cursornowy, rellines
+
 	screenWidth, screenHeight := ebiten.WindowSize()
 
 	screenHeight -= topopBarSize
@@ -836,6 +879,10 @@ func proceedcmd(command string) (returnstr string) {
 					case "commandlinesize":
 						if dyntypes.IsDynTypeMatch(var2set, "int") {
 							commandlineSize = dyntypes.DynInt(var2set)
+						}
+					case "limitter":
+						if dyntypes.IsDynTypeMatch(var2set, "bool") {
+							limitterenabled = dyntypes.DynBool(var2set)
 						}
 					default:
 						return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
