@@ -6,7 +6,9 @@ package main
  */
 
 import (
+	"bytes"
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"math"
@@ -22,10 +24,12 @@ import (
 	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 
 	"github.com/plasticgaming99/photon/assets/phfonts"
+	"github.com/plasticgaming99/photon/assets/phicons"
 	"github.com/plasticgaming99/photon/modules/dyntypes"
 
 	"github.com/hugolgst/rich-go/client"
@@ -140,13 +144,30 @@ func init() {
 
 	wg.Add(1)
 	go func() {
+		var err error
+		var iconphoton []image.Image
 		ebiten.SetVsyncEnabled(false)
 		ebiten.SetScreenClearedEveryFrame(false)
+
+		iconphotonreader := bytes.NewReader(phicons.PhotonIcon16)
+		_, iconphoton16, err := ebitenutil.NewImageFromReader(iconphotonreader)
+		iconphoton = append(iconphoton, iconphoton16)
+		iconphotonreader = bytes.NewReader(phicons.PhotonIcon32)
+		_, iconphoton32, err := ebitenutil.NewImageFromReader(iconphotonreader)
+		iconphoton = append(iconphoton, iconphoton32)
+		iconphotonreader = bytes.NewReader(phicons.PhotonIcon48)
+		_, iconphoton48, err := ebitenutil.NewImageFromReader(iconphotonreader)
+		iconphoton = append(iconphoton, iconphoton48)
+		iconphotonreader = bytes.NewReader(phicons.PhotonIcon128)
+		_, iconphoton128, err := ebitenutil.NewImageFromReader(iconphotonreader)
+		iconphoton = append(iconphoton, iconphoton128)
+
+		ebiten.SetWindowIcon(iconphoton)
 
 		/*100, 250, 500, 750, 1000 or your monitor's refresh rate*/
 		ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
-		err := clipboard.Init()
+		err = clipboard.Init()
 		if err != nil {
 			fmt.Println("**WARN** Clipboard is disabled.", err)
 		}

@@ -5,6 +5,14 @@ import (
 )
 
 var (
-	//go:embed photon2.png
-	PhotonIcon []byte
+	//go:embed photon16.png
+	PhotonIcon16 []byte
+	//go:embed photon32.png
+	PhotonIcon32 []byte
+	//go:embed photon48.png
+	PhotonIcon48 []byte
+	//go:embed photon128.png
+	PhotonIcon128 []byte
+	//go:embed photonbig.png
+	PhotonIconBig []byte
 )
