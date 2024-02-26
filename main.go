@@ -144,23 +144,23 @@ func init() {
 
 	wg.Add(1)
 	go func() {
-		var err error
 		var iconphoton []image.Image
 		ebiten.SetVsyncEnabled(false)
 		ebiten.SetScreenClearedEveryFrame(false)
 
 		iconphotonreader := bytes.NewReader(phicons.PhotonIcon16)
 		_, iconphoton16, err := ebitenutil.NewImageFromReader(iconphotonreader)
-		iconphoton = append(iconphoton, iconphoton16)
+		phloginfo(err)
 		iconphotonreader = bytes.NewReader(phicons.PhotonIcon32)
 		_, iconphoton32, err := ebitenutil.NewImageFromReader(iconphotonreader)
-		iconphoton = append(iconphoton, iconphoton32)
+		phloginfo(err)
 		iconphotonreader = bytes.NewReader(phicons.PhotonIcon48)
 		_, iconphoton48, err := ebitenutil.NewImageFromReader(iconphotonreader)
-		iconphoton = append(iconphoton, iconphoton48)
+		phloginfo(err)
 		iconphotonreader = bytes.NewReader(phicons.PhotonIcon128)
 		_, iconphoton128, err := ebitenutil.NewImageFromReader(iconphotonreader)
-		iconphoton = append(iconphoton, iconphoton128)
+		phloginfo(err)
+		iconphoton = append(iconphoton, iconphoton16, iconphoton32, iconphoton48, iconphoton128)
 
 		ebiten.SetWindowIcon(iconphoton)
 
@@ -944,6 +944,12 @@ func proceedcmd(command string) (returnstr string) {
 		return "No command was input."
 	}
 	return
+}
+
+func phloginfo(pherror error) {
+	if pherror != nil {
+		fmt.Println("error:", pherror)
+	}
 }
 
 // file load/save
