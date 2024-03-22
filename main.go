@@ -31,6 +31,7 @@ import (
 	"github.com/plasticgaming99/photon/assets/phfonts"
 	"github.com/plasticgaming99/photon/assets/phicons"
 	"github.com/plasticgaming99/photon/modules/dyntypes"
+	"github.com/plasticgaming99/photon/modules/plastk"
 
 	"github.com/hugolgst/rich-go/client"
 	"golang.design/x/clipboard"
@@ -78,15 +79,15 @@ var (
 	editingfile = string("")
 
 	// Textures
-	sideBar         = ebiten.NewImage(60, 3000)
+	sideBar         *ebiten.Image
 	infoBar         *ebiten.Image
 	commandLine     *ebiten.Image
 	cursorimg       = ebiten.NewImage(2, 15)
 	topopbar        *ebiten.Image
 	filesmenubutton = ebiten.NewImage(80, 20)
 	topopbarsep     = ebiten.NewImage(1, 20)
-	linessep        = ebiten.NewImage(2, 3000)
-	scrollbar       = ebiten.NewImage(25, 3000)
+	linessep        *ebiten.Image
+	scrollbar       *ebiten.Image
 	scrollbit       *ebiten.Image
 
 	// Texture options
@@ -658,7 +659,7 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 		cursorxstart int
 	)
 	for printext := 0; printext < len(photontext[rellines:]); {
-		if printext > int(Maxtext) {
+		if printext > int(Maxtext) || (len(photontext)-rellines) == 0 {
 			break
 		}
 		slicedtext := []rune(photontext[printext+rellines])
@@ -702,12 +703,13 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	// Draw scroll bit
 	/* init scroll-bit */
 	var textsize int
-	if len(photontext) <= Maxtext {
+	{
 		textsize = len(photontext) + Maxtext
-	} else {
-		textsize = len(photontext)
 	}
 	scrollbartext := float64(screenHeight-20) / float64((float64(textsize) / float64(Maxtext)))
+	if scrollbartext < 1 {
+		scrollbartext = 1
+	}
 	scrollbit = renewimg(scrollbit, scrollbarwidth, int(scrollbartext), color.RGBA{30, 30, 30, 255}) //ebiten.NewImage(25, int(scrollbartext))
 
 	scrollbitop := &ebiten.DrawImageOptions{}
@@ -739,9 +741,10 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 
 	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+infoBarSize-4, color.White)
 
+	plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, smallHackGenFont, 20, []string{"unko", "unko"})
+
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
-		scrollbar = renewimg(scrollbar, screenWidth, commandlineSize, color.RGBA{80, 80, 80, 255})
 		commandlineop := &ebiten.DrawImageOptions{}
 		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+commandlineSize))
 		screen.DrawImage(commandLine, commandlineop)
@@ -955,6 +958,9 @@ func phloginfo(pherror error) {
 // file load/save
 func phload(inputpath string) {
 	file, err := os.ReadFile(inputpath)
+	if err != nil {
+		panic(err)
+	}
 	editingfile, err = filepath.Abs(inputpath)
 	if err != nil {
 		panic(err)
