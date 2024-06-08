@@ -741,7 +741,7 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 
 	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+infoBarSize-4, color.White)
 
-	plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, smallHackGenFont, 20, []string{"unko", "unko"})
+	plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, smallHackGenFont, 20, []string{"Files", "Save"}, []string{"Edit", "Undo"}, []string{"View"})
 
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
