@@ -22,11 +22,13 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/text/language"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	textv2 "github.com/hajimehoshi/ebiten/v2/text/v2"
 
 	"github.com/plasticgaming99/photon/assets/phfonts"
 	"github.com/plasticgaming99/photon/assets/phicons"
@@ -46,6 +48,7 @@ var (
 	mplusSmallFont   font.Face
 	HackGenFont      font.Face
 	smallHackGenFont font.Face
+	smallHackGenV2   *textv2.GoTextFaceSource
 
 	photontext = []string{}
 
@@ -232,6 +235,7 @@ func init() {
 			DPI:     dpi,
 			Hinting: font.HintingFull,
 		})
+		smallHackGenV2, err = textv2.NewGoTextFaceSource(bytes.NewReader(phfonts.HackGenRegular_ttf))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -332,7 +336,7 @@ type Editor struct {
 	/*counter        int
 	kanjiText      string
 	kanjiTextColor color.RGBA*/
-	runeunko []rune
+	rune2Input []rune
 }
 
 func checkcurx(line int) {
@@ -352,23 +356,22 @@ func (g *Editor) Update() error {
 	 * detect cursor key actions
 	\*/
 	// Insert text
-	/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
 	if editorforcused && !(ebiten.IsKeyPressed(ebiten.KeyControl)) {
-		g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+		g.rune2Input = ebiten.AppendInputChars(g.rune2Input[:0])
 		// Detect left side
 		if cursornowx == 1 {
-			photontext[cursornowy-1] = string(g.runeunko) + photontext[cursornowy-1]
+			photontext[cursornowy-1] = string(g.rune2Input) + photontext[cursornowy-1]
 		} else
 		// Detect right side
 		if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko)
+			photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.rune2Input)
 		} else
 		// Other, Insert
 		{
-			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.runeunko) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
+			photontext[cursornowy-1] = string([]rune(photontext[cursornowy-1])[:cursornowx-1]) + string(g.rune2Input) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
 		}
 		// Move cursornowx. with cjk support yay!
-		cursornowx += len(g.runeunko)
+		cursornowx += len(g.rune2Input)
 	}
 
 	if editorforcused {
@@ -406,7 +409,7 @@ func (g *Editor) Update() error {
 			testslice := strings.Split(string(clipboard.Read(clipboard.FmtText)), "\n")
 			firsttext := string([]rune(photontext[cursornowy-1])[:cursornowx-1])
 			lasttext := string([]rune(photontext[cursornowy-1])[cursornowx-1:])
-			//{photontext[cursornowy-1] = string(g.runeunko)}
+			//{photontext[cursornowy-1] = string(g.rune2Input)}
 
 			fmt.Println(testslice)
 			if len(testslice) == 1 {
@@ -432,7 +435,7 @@ func (g *Editor) Update() error {
 				}
 			}
 		} else if repeatingKeyPressed(ebiten.KeyTab) {
-			/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.runeunko) (legacy impl) */
+			/*photontext[cursornowy-1] = photontext[cursornowy-1] + string(g.rune2Input) (legacy impl) */
 			// Detect text input
 			// Detect left side
 			if cursornowx == 1 {
@@ -523,11 +526,11 @@ func (g *Editor) Update() error {
 			photoncmd = string(cmdrune)
 		} else {
 			// detect text input
-			g.runeunko = ebiten.AppendInputChars(g.runeunko[:0])
+			g.rune2Input = ebiten.AppendInputChars(g.rune2Input[:0])
 
 			// insert text
-			if string(g.runeunko) != "" {
-				photoncmd += string(g.runeunko)
+			if string(g.rune2Input) != "" {
+				photoncmd += string(g.rune2Input)
 			}
 		}
 	}
@@ -545,16 +548,16 @@ func (g *Editor) Update() error {
 	/*\
 	 * Detect touch on buttons.
 	\*/
-	mousex, mousey := ebiten.CursorPosition()
+	/*mousex, mousey := ebiten.CursorPosition()
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		clickrepeated = true
 	}
 	if clickrepeated && !ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		if mousex < 80 && mousey < 20 {
-			fmt.Println("unko!!!")
+			fmt.Println("test!!!")
 		}
 		clickrepeated = false
-	}
+	}*/
 
 	/*\
 	 * Detect cursor's position, and changes cursor shape
@@ -591,6 +594,11 @@ var (
 )
 
 func (g *Editor) Draw(screen *ebiten.Image) {
+	hackgen4info := &textv2.GoTextFace{
+		Source:   smallHackGenV2,
+		Size:     16,
+		Language: language.Japanese,
+	}
 
 	if (prevcurx == cursornowx && prevcury == cursornowy && prevrell == rellines) && limitterenabled {
 		time.Sleep(time.Duration(phburst) * time.Millisecond)
@@ -643,14 +651,39 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 		if printext > int(Maxtext) || (len(photontext)-rellines) == 0 {
 			break
 		}
-		slicedtext := []rune(photontext[printext+rellines])
+		//slicedtext := []rune(photontext[printext+rellines])
 		textx = 55
 		text.Draw(screen, strconv.Itoa(printext+rellines+1), smallHackGenFont, textx+10, ((printext + 2) * 18), color.White)
 		textx = textx + (9 * len(strconv.Itoa(int(Maxtext)+rellines)))
 		textx += 20
 		cursorxstart = textx + 0
+		spaceSplit := strings.Split(photontext[printext+rellines], " ")
+		var samplue []textv2.Glyph
+
+		//textv2.Draw(screen, photontext[printext+rellines], hackgen4info, op)
+
+		for i := 0; i < len(spaceSplit); i++ {
+			samplue = textv2.AppendGlyphs(nil, tab2space(photontext[printext+rellines]), hackgen4info, nil)
+		}
+		for i, gl := range samplue {
+			op := &ebiten.DrawImageOptions{}
+			//op.GeoM.Translate(90, ((float64(printext)+1)*18)+5)
+			syntstat, endsat := ezSyntaxHighlight(photontext[printext+rellines])
+			if i >= endsat {
+				op.ColorScale.Reset()
+			} else if syntstat == "good" {
+				op.ColorScale.Scale(0, 0.5, 0, 0)
+			}
+			if gl.Image == nil {
+				continue
+			}
+			op.GeoM.Translate(float64(textx-1), ((float64(printext)+1)*18)+5)
+			op.GeoM.Translate(gl.X, gl.Y)
+
+			screen.DrawImage(gl.Image, op)
+		}
 		// start column loop
-		for textrepeat := 0; textrepeat < len(slicedtext); {
+		/*for textrepeat := 0; textrepeat < len(slicedtext); {
 			if string("	") == string(slicedtext[textrepeat]) {
 				textx += 30
 			} else if len(string(slicedtext[textrepeat])) != 1 {
@@ -663,16 +696,18 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 				textx += 9
 			}
 			textrepeat++
-		}
+		}*/
 		printext++
 	}
 
 	// draw cursor
-	nonkanj, kanj, tabs := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
-	cursorproceedx := (nonkanj*9 + kanj*15 + tabs*36) + cursorxstart
+	//nonkanj, kanj, tabs := checkMixedKanjiLength(photontext[cursornowy-1], cursornowx)
+	//cursorproceedx := (nonkanj*9 + kanj*15 + tabs*36) + cursorxstart
 
 	cursorop := &ebiten.DrawImageOptions{}
-	cursorop.GeoM.Translate(float64(cursorproceedx), float64((cursornowy-(rellines))*18)+5)
+	//cursorop.GeoM.Translate(float64(cursorproceedx), float64((cursornowy-(rellines))*18)+5)
+	txtx, _ := textv2.Measure(photontext[cursornowy-1][:cursornowx-1], hackgen4info, 0)
+	cursorop.GeoM.Translate(txtx+90, float64((cursornowy-(rellines))*18)+5)
 	screen.DrawImage(cursorimg, cursorop)
 
 	// Draw scroll bar base
@@ -716,25 +751,66 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	topsep1op.GeoM.Translate(80, 0)
 	screen.DrawImage(topopbarsep, topsep1op)
 
-	text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+infoBarSize-4, color.White)
-
-	text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+infoBarSize-4, color.White)
-	//[]string{"Files", "Save"}, []string{"Edit", "Undo"}, []string{"View"}
-	var files []plastk.MenuBarColumn
 	{
-		filestmp := plastk.MenuBarColumn{
-			ColumnType: "dropdown",
-			ColumnName: "Files",
-			ColumnBase: nil,
-		}
-		edittmp := plastk.MenuBarColumn{
-			ColumnType: "dropdown",
-			ColumnName: "Edit",
-			ColumnBase: nil,
-		}
-		files = append(files, filestmp, edittmp)
+		zurasu, padding := textv2.Measure(rightinfotext, hackgen4info, 0)
+		infoBarTextY := float64(screenHeight + ((infoBarSize - int(padding)) / 2))
+		//text.Draw(screen, leftinfotxt, smallHackGenFont, 5, screenHeight+infoBarSize-4, color.White)
+		op := &textv2.DrawOptions{}
+		op.GeoM.Translate(2, infoBarTextY)
+		textv2.Draw(screen, leftinfotxt, hackgen4info, op)
+		op = &textv2.DrawOptions{}
+		op.GeoM.Translate(float64(screenWidth-5)-zurasu, infoBarTextY)
+		//text.Draw(screen, rightinfotext, smallHackGenFont, screenWidth-((len(rightinfotext))*10), screenHeight+infoBarSize-4, color.White)
+		textv2.Draw(screen, rightinfotext, hackgen4info, op)
 	}
-	plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, smallHackGenFont, 20, files)
+	{
+		//[]string{"Files", "Save"}, []string{"Edit", "Undo"}, []string{"View"}
+		var mbfiles []plastk.MenuBarColumn
+		{
+			filestmp := plastk.MenuBarColumn{
+				ColumnType: "dropdown",
+				ColumnName: "Files",
+				ColumnBase: nil,
+			}
+			exittmp := plastk.MenuBarColumn{
+				ColumnType: "button",
+				ColumnName: "Exit",
+				ColumnBase: nil,
+			}
+
+			mbfiles = append(mbfiles, filestmp, exittmp)
+		}
+		var mbedit []plastk.MenuBarColumn
+		{
+			edittmp := plastk.MenuBarColumn{
+				ColumnType: "dropdown",
+				ColumnName: "Edit",
+				ColumnBase: nil,
+			}
+			undotmp := plastk.MenuBarColumn{
+				ColumnType: "button",
+				ColumnName: "Undo",
+				ColumnBase: nil,
+			}
+			redotmp := plastk.MenuBarColumn{
+				ColumnType: "button",
+				ColumnName: "Redo",
+				ColumnBase: nil,
+			}
+			mbedit = append(mbedit, edittmp, undotmp, redotmp)
+			mbedit = append(mbedit, edittmp, undotmp, redotmp)
+			mbedit = append(mbedit, edittmp, undotmp, redotmp)
+			mbedit = append(mbedit, edittmp, undotmp, redotmp)
+		}
+		var mbabout []plastk.MenuBarColumn
+		mbabout = append(mbabout, plastk.MenuBarColumn{
+			ColumnType: "button",
+			ColumnName: "About",
+			ColumnBase: nil,
+		},
+		)
+		plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, hackgen4info, 20, mbfiles, mbedit, mbabout)
+	}
 
 	// draw command-line
 	if commandlineforcused || cmdresult != "" {
@@ -762,6 +838,27 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 func (g *Editor) Layout(outsideWidth, outsideHeight int) (int, int) {
 	screenWidth, screenHeight := ebiten.WindowSize()
 	return screenWidth, screenHeight
+}
+
+func ezSyntaxHighlight(txt string) (string, int) {
+	splitted := strings.Split(txt, " ")
+	ret := len([]rune(splitted[0]))
+	if splitted[0] == "package" {
+		return "good", ret
+	}
+	if splitted[0] == "import" {
+		return "good", ret
+	}
+	if splitted[0] == "func" {
+		return "good", ret
+	}
+	if splitted[0] == "fn" {
+		return "good", ret
+	}
+	if splitted[0] == "var" {
+		return "good", ret
+	}
+	return "", 0
 }
 
 func main() {
@@ -794,7 +891,7 @@ func main() {
 		})
 		if err != nil {
 			fmt.Println(err)
-			goto activityloop
+			goto loginloop
 		}
 		if !success {
 			fmt.Println("rich presence active")
@@ -943,6 +1040,10 @@ func proceedcmd(command string) (returnstr string) {
 	return
 }
 
+func tab2space(inp string) string {
+	return strings.ReplaceAll(inp, "	", "   ")
+}
+
 func phloginfo(pherror error) {
 	if pherror != nil {
 		fmt.Println("error:", pherror)
@@ -1003,7 +1104,3 @@ func phsave(dir string) {
 		fmt.Println(err, "Save failed")
 	}
 }
-
-/*for index, runeValue := range "超unko" {
-println("位置:", index, "文字:", string([]rune{runeValue}))
-}*/
