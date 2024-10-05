@@ -14,16 +14,31 @@ var (
 	clicktoggle    bool
 	clickendurance bool
 	prevmenu       int
+	prevID         string
+
+	pressedprevX int
+	pressedprevY int
+
+	buttonD *ebiten.Image
 )
+
+func init() {
+	buttonD = ebiten.NewImage(1, 1)
+	buttonD.Fill(color.RGBA{100, 100, 100, 0})
+}
 
 type MenuBarColumn struct {
 	// three column types currently avaliable: button, dropdown, separator
 	ColumnType string
 	// title of column
 	ColumnName string
+	// Information of column
+	ColumnDesc string
 	// if column type is button, other than 0 is ignored.
 	// separator never has column.
 	ColumnBase []MenuBarColumn
+	// Detect if Button
+	ColumnID string
 }
 
 func TransformColumn([]MenuBarColumn) []string {
@@ -35,16 +50,16 @@ func DrawMenuBar(targImage *ebiten.Image, targColor color.Color, targFont *text.
 	menuSeparation = nil
 	menuSeparation = append(menuSeparation, int(0))
 	var (
-		targImgWidth  = targImage.Bounds().Dx()
-		targImgHeight = targImage.Bounds().Dy()
+		targImgWidth = targImage.Bounds().Dx()
+		//targImgHeight = targImage.Bounds().Dy()
 	)
-	image2merge := ebiten.NewImage(targImgWidth, targImgHeight)
 	menuBarImage := ebiten.NewImage(targImgWidth, menuHeight)
 	menuBarImage.Fill(targColor)
 
-	image2merge.DrawImage(menuBarImage, nil)
+	targImage.DrawImage(menuBarImage, nil)
 
 	relx := 0
+	buttonSize := 200
 	for i := 0; len(menu) > i; i++ {
 		mousex, mousey := ebiten.CursorPosition()
 		currentbuttonbase := relx
@@ -68,9 +83,10 @@ func DrawMenuBar(targImage *ebiten.Image, targColor color.Color, targFont *text.
 			if prevmenu == i && clicktoggle {
 				op := &ebiten.DrawImageOptions{}
 				op.GeoM.Translate(float64(relx-5), float64(menuHeight))
-				img := ebiten.NewImage(200, menuHeight*(len(menu[i])-1)+1)
+				img := ebiten.NewImage(buttonSize, menuHeight*(len(menu[i])-1)+1)
 				img.Fill(color.Black)
 				targImage.DrawImage(img, op)
+				img.Deallocate()
 			}
 			if clickrepeated && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 				clickrepeated = false
@@ -83,11 +99,11 @@ func DrawMenuBar(targImage *ebiten.Image, targColor color.Color, targFont *text.
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(float64(relx-5), 0)
 
-		image2merge.DrawImage(menuColumnButton, op)
+		targImage.DrawImage(menuColumnButton, op)
 		//text.Draw(image2merge, menu[i][0].ColumnName, targFont, relx, menuHeight-4, color.White)
 		op2 := &text.DrawOptions{}
 		op2.GeoM.Translate(float64(relx), (float64(menuHeight)-(fontHeight))/2)
-		text.Draw(image2merge, menu[i][0].ColumnName, targFont, op2)
+		text.Draw(targImage, menu[i][0].ColumnName, targFont, op2)
 
 		relx += (int(fontWidth) + 5)
 
@@ -95,11 +111,40 @@ func DrawMenuBar(targImage *ebiten.Image, targColor color.Color, targFont *text.
 
 		if clicktoggle && prevmenu == i {
 			for ii := 1; ii < len(menu[i]); ii++ {
+				if ((mousex >= currentbuttonbase) && (mousex <= currentbuttonbase+buttonSize)) && ((mousey >= menuHeight*ii) && (mousey <= menuHeight*(ii+1))) {
+					buttonD = ReNewImg(buttonD, buttonSize, menuHeight, color.RGBA{100, 100, 100, 0})
+					op := &ebiten.DrawImageOptions{}
+					op.GeoM.Translate(float64(currentbuttonbase), float64(menuHeight*ii))
+					targImage.DrawImage(buttonD, op)
+					pressedprevX, pressedprevY = i, ii
+					prevID = menu[i][ii].ColumnID
+				}
 				op := &text.DrawOptions{}
 				op.GeoM.Translate(float64(currentbuttonbase), float64(menuHeight*ii))
 				text.Draw(targImage, menu[i][ii].ColumnName, targFont, op)
 			}
 		}
 	}
-	targImage.DrawImage(image2merge, nil)
+	//targImage.DrawImage(image2merge, nil)
+}
+
+func MenuBarDetectClicked(column int, line int) bool {
+	if column == pressedprevX && line == pressedprevY {
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			pressedprevX, pressedprevY = 0, 0
+			return true
+		}
+	}
+	return false
+}
+
+// make detection easier
+func MenuBarDetectClickedByID(columnID string) bool {
+	if columnID == prevID {
+		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+			prevID = ""
+			return true
+		}
+	}
+	return false
 }

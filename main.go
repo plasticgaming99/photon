@@ -51,6 +51,7 @@ var (
 	smallHackGenV2   *textv2.GoTextFaceSource
 
 	photontext = []string{}
+	undohist   = []undoPreserver{}
 
 	photoncmd   = string("")
 	cmdresult   = string("")
@@ -65,6 +66,7 @@ var (
 
 	closewindow   = false
 	clickrepeated = false
+	modalmode     = false
 	returncode    = string("\n")
 	returntype    = string("")
 
@@ -88,7 +90,6 @@ var (
 	cursorimg       = ebiten.NewImage(2, 15)
 	topopbar        *ebiten.Image
 	filesmenubutton = ebiten.NewImage(80, 20)
-	topopbarsep     = ebiten.NewImage(1, 20)
 	linessep        *ebiten.Image
 	scrollbar       *ebiten.Image
 	scrollbit       *ebiten.Image
@@ -104,6 +105,26 @@ var (
 	commandlineSize = 20
 	scrollbarwidth  = 18
 )
+
+var (
+	synctps  = &sync.WaitGroup{}
+	synctps2 = &sync.WaitGroup{}
+)
+
+type undoPreserver struct {
+	textlet string
+	cursorx int
+	cursory int
+}
+
+func saveUndoAppend(in string) undoPreserver {
+	toappend := undoPreserver{
+		textlet: in,
+		cursorx: cursornowx - 1,
+		cursory: cursornowy - 1,
+	}
+	return toappend
+}
 
 func repeatingKeyPressed(key ebiten.Key) bool {
 	var (
@@ -292,14 +313,13 @@ func init() {
 
 	{
 		// After executed PhotonRC, Initialize textures
-		sideBar = ebiten.NewImage(60, 3000)
-		infoBar = ebiten.NewImage(4100, infoBarSize)
-		commandLine = ebiten.NewImage(4100, commandlineSize)
+		sideBar = ebiten.NewImage(60, 100)
+		infoBar = ebiten.NewImage(100, infoBarSize)
+		commandLine = ebiten.NewImage(100, commandlineSize)
 		cursorimg = ebiten.NewImage(2, 15)
 		topopbar = ebiten.NewImage(4100, topopBarSize)
 		filesmenubutton = ebiten.NewImage(80, 20)
-		topopbarsep = ebiten.NewImage(1, 20)
-		linessep = ebiten.NewImage(2, 3000)
+		linessep = ebiten.NewImage(2, 100)
 		scrollbar = ebiten.NewImage(scrollbarwidth, 100)
 		scrollbit = ebiten.NewImage(scrollbarwidth, 100)
 	}
@@ -318,8 +338,6 @@ func init() {
 		topopbar.Fill(color.RGBA{100, 100, 100, 255})
 		/* init top-op-bar "files" button */
 		filesmenubutton.Fill(color.RGBA{110, 110, 110, 255})
-		/* init top-op-bar separator */
-		topopbarsep.Fill(color.RGBA{0, 0, 0, 255})
 		/* init line-bar separator */
 		linessep.Fill(color.RGBA{100, 100, 100, 255})
 		/* init scroll-bar */
@@ -350,6 +368,16 @@ func checkcurx(line int) {
 }
 
 func (g *Editor) Update() error {
+	synctps.Add(1)
+	if plastk.MenuBarDetectClickedByID("fileswritebutton") {
+		proceedcmd("write")
+	}
+	if plastk.MenuBarDetectClickedByID("filesexitbutton") {
+		proceedcmd("q")
+	}
+	if plastk.MenuBarDetectClickedByID("editredobutton") {
+		proceedcmd("q")
+	}
 	// Update Text-info
 	// photonlines = len(photontext)
 	/*\
@@ -486,25 +514,28 @@ func (g *Editor) Update() error {
 						photontext = photontext[:len(photontext)-1]
 						cursornowy--
 					} else
-					//
+					// normal deletion
 					if cursornowx-1 == len([]rune(photontext[cursornowy-1])) {
-						// 文字列をruneに変換
+						// convert 2 rune
 						runes := []rune(photontext[cursornowy-1])
-						// 最後の文字を削除
+						//save last char
+						////undohist = append(undohist, saveUndoAppend(string(runes[len(runes)-1:])))
+						////fmt.Println(undohist)
+						// delete last char
 						runes = runes[:len(runes)-1]
-						// runeを文字列に変換して元のスライスに代入
+						// convert rune 2 string and insert
 						photontext[cursornowy-1] = string(runes)
-						time.Sleep(1 * time.Millisecond)
 						// Move to left
 						cursornowx--
 					} else {
 						// Convert to rune
 						runes := []rune(photontext[cursornowy-1])[:cursornowx-1]
+						//save last char
+						////undohist = append(undohist, saveUndoAppend(string(runes[len(runes)-1:])))
 						// Delete last
 						runes = runes[:len(runes)-1]
 						// Convert to string and insert
 						photontext[cursornowy-1] = string(runes) + string([]rune(photontext[cursornowy-1])[cursornowx-1:])
-						time.Sleep(1 * time.Millisecond)
 						// Move to left
 						cursornowx--
 					}
@@ -577,6 +608,7 @@ func (g *Editor) Update() error {
 	if closewindow {
 		return fmt.Errorf("close")
 	}
+	synctps.Done()
 
 	return nil
 }
@@ -594,6 +626,7 @@ var (
 )
 
 func (g *Editor) Draw(screen *ebiten.Image) {
+	synctps.Wait()
 	hackgen4info := &textv2.GoTextFace{
 		Source:   smallHackGenV2,
 		Size:     16,
@@ -735,21 +768,14 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	// Draw lines separator
 	linessepop := &ebiten.DrawImageOptions{}
 	linessepop.GeoM.Translate(float64(cursorxstart-5), 0)
+	linessep = renewimg(linessep, 2, screen.Bounds().Dy(), color.RGBA{100, 100, 100, 255})
 	screen.DrawImage(linessep, linessepop)
 
 	// Draw info-bar
 	infoBarop := &ebiten.DrawImageOptions{}
 	infoBarop.GeoM.Translate(0, float64(screenHeight))
+	infoBar = renewimg(infoBar, screen.Bounds().Dx(), 100, color.RGBA{87, 97, 87, 255})
 	screen.DrawImage(infoBar, infoBarop)
-
-	//// Final render --- Top operation-bar
-	screen.DrawImage(topopbar, nil)
-	//// Files Button
-	screen.DrawImage(filesmenubutton, nil)
-	// Draw separator of files
-	topsep1op := &ebiten.DrawImageOptions{}
-	topsep1op.GeoM.Translate(80, 0)
-	screen.DrawImage(topopbarsep, topsep1op)
 
 	{
 		zurasu, padding := textv2.Measure(rightinfotext, hackgen4info, 0)
@@ -770,43 +796,42 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 			filestmp := plastk.MenuBarColumn{
 				ColumnType: "dropdown",
 				ColumnName: "Files",
-				ColumnBase: nil,
+			}
+			savetmp := plastk.MenuBarColumn{
+				ColumnType: "button",
+				ColumnName: "Save",
+				ColumnID:   "filessavebutton",
 			}
 			exittmp := plastk.MenuBarColumn{
 				ColumnType: "button",
 				ColumnName: "Exit",
-				ColumnBase: nil,
+				ColumnID:   "filesexitbutton",
 			}
 
-			mbfiles = append(mbfiles, filestmp, exittmp)
+			mbfiles = append(mbfiles, filestmp, savetmp, exittmp)
 		}
 		var mbedit []plastk.MenuBarColumn
 		{
 			edittmp := plastk.MenuBarColumn{
 				ColumnType: "dropdown",
 				ColumnName: "Edit",
-				ColumnBase: nil,
 			}
 			undotmp := plastk.MenuBarColumn{
 				ColumnType: "button",
 				ColumnName: "Undo",
-				ColumnBase: nil,
+				ColumnID:   "editundobutton",
 			}
 			redotmp := plastk.MenuBarColumn{
 				ColumnType: "button",
 				ColumnName: "Redo",
-				ColumnBase: nil,
+				ColumnID:   "editredobutton",
 			}
-			mbedit = append(mbedit, edittmp, undotmp, redotmp)
-			mbedit = append(mbedit, edittmp, undotmp, redotmp)
-			mbedit = append(mbedit, edittmp, undotmp, redotmp)
 			mbedit = append(mbedit, edittmp, undotmp, redotmp)
 		}
 		var mbabout []plastk.MenuBarColumn
 		mbabout = append(mbabout, plastk.MenuBarColumn{
 			ColumnType: "button",
 			ColumnName: "About",
-			ColumnBase: nil,
 		},
 		)
 		plastk.DrawMenuBar(screen, color.RGBA{100, 100, 100, 255}, hackgen4info, 20, mbfiles, mbedit, mbabout)
@@ -816,6 +841,7 @@ func (g *Editor) Draw(screen *ebiten.Image) {
 	if commandlineforcused || cmdresult != "" {
 		commandlineop := &ebiten.DrawImageOptions{}
 		commandlineop.GeoM.Translate(float64(0), float64(screenHeight+commandlineSize))
+		commandLine = plastk.ReNewImg(commandLine, screenWidth, commandlineSize, color.RGBA{39, 39, 39, 255})
 		screen.DrawImage(commandLine, commandlineop)
 		if commandlineforcused {
 			text.Draw(screen, photoncmd, smallHackGenFont, 5, screenHeight+15+commandlineSize, color.White)
@@ -1023,6 +1049,14 @@ func proceedcmd(command string) (returnstr string) {
 					case "limitterlevel":
 						if dyntypes.IsDynTypeMatch(var2set, "int") {
 							limitterlevel = dyntypes.DynInt(var2set)
+						}
+					case "modalmode":
+						if dyntypes.IsDynTypeMatch(var2set, "bool") {
+							modalmode = dyntypes.DynBool(var2set)
+						}
+					case "ebiten-tps":
+						if dyntypes.IsDynTypeMatch(var2set, "int") {
+							ebiten.SetTPS(dyntypes.DynInt(var2set))
 						}
 					default:
 						return "No internal variables named " + (strings.Split(command2slice[1], "="))[0]
